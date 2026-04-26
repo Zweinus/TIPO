@@ -1,4 +1,4 @@
-
+const { useState, useEffect, useRef } = React;
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const OWNERS = [
