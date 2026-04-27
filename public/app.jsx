@@ -82,15 +82,33 @@ const STORAGE_KEY = "gezins-assistent-v4";
 
 async function loadItems() {
   try {
-    const r = await window.storage.get(STORAGE_KEY);
-    if (r?.value) return JSON.parse(r.value);
+    const r = await fetch("/api/claude", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "loadItems" }),
+    });
+    const data = await r.json();
+    if (Array.isArray(data) && data.length > 0) {
+      return data.map(i => ({
+        id: i.id, text: i.text, done: i.done, list: i.list,
+        cat: i.cat, owner: i.owner, notes: i.notes,
+        milestones: i.milestones || [], aiContent: i.ai_content || null,
+      }));
+    }
   } catch (_) {}
   return DEFAULT_ITEMS;
 }
 
 async function saveItems(items) {
-  try { await window.storage.set(STORAGE_KEY, JSON.stringify(items)); } catch (_) {}
+  try {
+    await fetch("/api/claude", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "saveItems", items }),
+    });
+  } catch (_) {}
 }
+Commit en wacht op Vercel!Sonnet 4.6
 
 // ─── Claude API ───────────────────────────────────────────────────────────────
 
