@@ -108,7 +108,6 @@ async function saveItems(items) {
     });
   } catch (_) {}
 }
-Commit en wacht op Vercel!Sonnet 4.6
 
 // ─── Claude API ───────────────────────────────────────────────────────────────
 
