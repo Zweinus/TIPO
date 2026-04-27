@@ -137,8 +137,9 @@ async function apiCall(body) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  return r.json();
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+  return data;
 }
 
 async function loadData(key, fallback) {
@@ -160,7 +161,7 @@ async function saveData(key, value) {
 
 // ─── Claude API ───────────────────────────────────────────────────────────────
 async function callClaude(messages, system, maxTokens = 1000) {
-  const data = await apiCall({ model: "claude-sonnet-4-20250514", max_tokens: maxTokens, system, messages });
+  const data = await apiCall({ model: "claude-sonnet-4-5", max_tokens: maxTokens, system, messages });
   return data.content?.find(b => b.type === "text")?.text || "";
 }
 
