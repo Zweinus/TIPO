@@ -129,6 +129,8 @@ const KEYS = {
   completions: "tipo-v5-completions",
   recaps:   "tipo-v5-recaps",
   memory:   "tipo-v5-memory",
+  blueprintSven: "tipo-v5-blueprint-sven",
+  blueprintEva:  "tipo-v5-blueprint-eva",
 };
 
 async function apiCall(body) {
@@ -137,9 +139,8 @@ async function apiCall(body) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  const data = await r.json();
-  if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
-  return data;
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
 }
 
 async function loadData(key, fallback) {
@@ -166,7 +167,7 @@ async function callClaude(messages, system, maxTokens = 1000) {
 }
 
 async function askTIPO(messages, tasks, memory) {
-  const system = `Je bent TIPO, de persoonlijke AI-assistent van Sven en Eva Tilanus-Poorthuis. Ze verwachten hun eerste baby in september 2025 en beheren samen hun huishouden, gezondheid en toekomstplannen.
+  const system = `Je bent TIPO, de persoonlijke AI-assistent van Sven en Eva Tilanus-Poorthuis. Ze verwachten hun eerste baby in september 2026 en beheren samen hun huishouden, gezondheid en toekomstplannen.
 
 ${memory ? `Geheugen uit eerdere gesprekken:\n${memory}\n` : ""}
 
@@ -198,7 +199,7 @@ Reageer altijd in het Nederlands. Wees warm, concreet en beknopt. Je kent Peter 
 }
 
 async function prepareTask(task) {
-  const system = `Je bent TIPO, assistent van Sven en Eva (baby verwacht september 2025). Bereid taken concreet voor: ideeën, bronnen, stappenplan, aandachtspunten. Gebruik Markdown (##, -, **bold**). Max 350 woorden. Schrijf in het Nederlands.`;
+  const system = `Je bent TIPO, assistent van Sven en Eva (baby verwacht september 2026). Bereid taken concreet voor: ideeën, bronnen, stappenplan, aandachtspunten. Gebruik Markdown (##, -, **bold**). Max 350 woorden. Schrijf in het Nederlands.`;
   return callClaude(
     [{ role: "user", content: `Bereid voor: "${task.text}"\n\nContext: ${task.notes || "geen"}` }],
     system, 1200
@@ -330,16 +331,16 @@ function AIContent({ content, loading, color }) {
 }
 
 // ─── TAKEN TAB ────────────────────────────────────────────────────────────────
-function TasksTab({ tasks, setTasks, memory }) {
+function TasksTab({ tasks, setTasks, memory, filterOwner }) {
   const [tab, setTab]             = useState("nu");
   const [filterCat, setFilterCat] = useState(null);
-  const [filterOwner, setFilterOwner] = useState(null);
   const [adding, setAdding]       = useState(false);
   const [newText, setNewText]     = useState("");
   const [newNotes, setNewNotes]   = useState("");
   const [newCat, setNewCat]       = useState("huis");
   const [newList, setNewList]     = useState("nu");
   const [newOwner, setNewOwner]   = useState("samen");
+  const [newDeadline, setNewDeadline] = useState("");
   const [detailId, setDetailId]   = useState(null);
   const [draftNotes, setDraftNotes] = useState("");
   const [editNotes, setEditNotes] = useState(false);
@@ -383,8 +384,8 @@ function TasksTab({ tasks, setTasks, memory }) {
 
   const addTask = () => {
     if (!newText.trim()) return;
-    setTasks(prev => [...prev, { id: nextId++, text: newText.trim(), done: false, list: newList, cat: newCat, owner: newOwner, notes: newNotes.trim(), milestones: [], aiContent: null }]);
-    setNewText(""); setNewNotes(""); setAdding(false);
+    setTasks(prev => [...prev, { id: nextId++, text: newText.trim(), done: false, list: newList, cat: newCat, owner: newOwner, notes: newNotes.trim(), deadline: newDeadline || null, milestones: [], aiContent: null }]);
+    setNewText(""); setNewNotes(""); setNewDeadline(""); setAdding(false);
   };
 
   const applyActions = (actions, prev) => {
@@ -456,6 +457,25 @@ function TasksTab({ tasks, setTasks, memory }) {
   const TaskRow = ({ task, faded = false }) => {
     const cat = getCat(task.cat);
     const pct = progress(task.milestones);
+
+    // Deadline kleur
+    const deadlineColor = (() => {
+      if (!task.deadline || faded) return null;
+      const days = Math.ceil((new Date(task.deadline) - new Date()) / 86400000);
+      if (days < 0)  return C.red;
+      if (days <= 3) return "#B05A00";
+      if (days <= 7) return "#8B5E1A";
+      return C.muted;
+    })();
+    const deadlineLabel = (() => {
+      if (!task.deadline || faded) return null;
+      const days = Math.ceil((new Date(task.deadline) - new Date()) / 86400000);
+      if (days < 0)  return `${Math.abs(days)}d te laat`;
+      if (days === 0) return "Vandaag!";
+      if (days === 1) return "Morgen";
+      return `${days}d`;
+    })();
+
     return (
       <div style={{ padding: "13px 0", borderBottom: `1px solid ${C.sand}`, opacity: faded ? 0.5 : 1 }}>
         <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
@@ -476,6 +496,11 @@ function TasksTab({ tasks, setTasks, memory }) {
               {task.notes    && <span style={{ fontSize: 10, color: C.sandDark }}>· 📝</span>}
               {task.aiContent && <span style={{ fontSize: 10, color: C.gold }}>· ✦</span>}
               {pct !== null  && <span style={{ fontSize: 10, color: pct === 100 ? currentList.color : C.sandDark }}>· {pct}%</span>}
+              {deadlineLabel && (
+                <span style={{ fontSize: 10, color: deadlineColor, background: `${deadlineColor}18`, padding: "1px 7px", borderRadius: 8, fontWeight: 600 }}>
+                  ⏱ {deadlineLabel}
+                </span>
+              )}
             </div>
             {pct !== null && !faded && <ProgressBar milestones={task.milestones} color={currentList.color} />}
           </div>
@@ -505,7 +530,7 @@ function TasksTab({ tasks, setTasks, memory }) {
           return (
             <button key={list.id} onClick={() => { setTab(list.id); setFilterCat(null); }} style={{
               flex: 1, padding: "10px 4px 12px", border: "none", background: "none", cursor: "pointer",
-              color: active ? list.color : "#666",
+              color: active ? list.color : "#AAA",
               borderBottom: active ? `2.5px solid ${list.color}` : "2.5px solid transparent",
               display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
               fontFamily: "'Georgia', serif",
@@ -568,6 +593,13 @@ function TasksTab({ tasks, setTasks, memory }) {
             <textarea value={newNotes} onChange={e => setNewNotes(e.target.value)} placeholder="Notities (optioneel)..." rows={2}
               style={{ padding: "10px 14px", borderRadius: 12, border: `1px solid ${C.sand}`, fontSize: 13, fontFamily: "'Georgia', serif", background: C.paper, outline: "none", color: C.brown, resize: "none", lineHeight: 1.5 }}
             />
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: 12, color: C.muted, flexShrink: 0 }}>⏱ Deadline</span>
+              <input type="date" value={newDeadline} onChange={e => setNewDeadline(e.target.value)}
+                style={{ flex: 1, padding: "8px 12px", borderRadius: 10, border: `1px solid ${C.sand}`, fontSize: 13, fontFamily: "'Georgia', serif", background: C.paper, outline: "none", color: newDeadline ? C.dark : C.muted }}
+              />
+              {newDeadline && <button onClick={() => setNewDeadline("")} style={{ background: "none", border: "none", color: C.sandDark, cursor: "pointer", fontSize: 18 }}>×</button>}
+            </div>
             <OwnerPicker value={newOwner} onChange={setNewOwner} />
             <div style={{ display: "flex", gap: 6, overflowX: "auto", scrollbarWidth: "none" }}>
               {CATEGORIES.map(cat => (
@@ -662,6 +694,27 @@ function TasksTab({ tasks, setTasks, memory }) {
                   </div>
                 )}
                 {editNotes && <button onClick={saveNotes} style={{ marginTop: 8, padding: "7px 16px", borderRadius: 9, border: "none", background: list.color, color: "white", fontSize: 13, cursor: "pointer" }}>Opslaan</button>}
+              </div>
+
+              {/* Deadline */}
+              <div style={{ background: C.sand, borderRadius: 14, padding: "13px 15px", marginBottom: 10 }}>
+                <div style={{ fontSize: 9, letterSpacing: 2, color: C.muted, textTransform: "uppercase", marginBottom: 10 }}>⏱ Deadline</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <input type="date" value={detailItem.deadline || ""}
+                    onChange={e => setTasks(prev => prev.map(t => t.id === detailItem.id ? { ...t, deadline: e.target.value || null } : t))}
+                    style={{ flex: 1, padding: "8px 12px", borderRadius: 10, border: `1px solid ${C.sandDark}`, fontSize: 13, fontFamily: "'Georgia', serif", background: C.paper, outline: "none", color: detailItem.deadline ? C.dark : C.muted }}
+                  />
+                  {detailItem.deadline && (() => {
+                    const days = Math.ceil((new Date(detailItem.deadline) - new Date()) / 86400000);
+                    const color = days < 0 ? C.red : days <= 3 ? "#B05A00" : days <= 7 ? "#8B5E1A" : C.green;
+                    const label = days < 0 ? `${Math.abs(days)} dagen te laat` : days === 0 ? "Vandaag!" : days === 1 ? "Morgen" : `Nog ${days} dagen`;
+                    return <span style={{ fontSize: 12, color, fontWeight: 600 }}>{label}</span>;
+                  })()}
+                  {detailItem.deadline && (
+                    <button onClick={() => setTasks(prev => prev.map(t => t.id === detailItem.id ? { ...t, deadline: null } : t))}
+                      style={{ background: "none", border: "none", color: C.sandDark, cursor: "pointer", fontSize: 18 }}>×</button>
+                  )}
+                </div>
               </div>
 
               {/* AI preparation */}
@@ -778,7 +831,7 @@ function TasksTab({ tasks, setTasks, memory }) {
 }
 
 // ─── ROUTINES TAB ─────────────────────────────────────────────────────────────
-function RoutinesTab({ routines, setRoutines }) {
+function RoutinesTab({ routines, setRoutines, filterOwner }) {
   const [period, setPeriod]   = useState("weekly");
   const [filter, setFilter]   = useState(null);
   const [adding, setAdding]   = useState(false);
@@ -825,7 +878,8 @@ function RoutinesTab({ routines, setRoutines }) {
     setNewText(""); setAdding(false);
   };
 
-  const visible = routines[period].filter(r => !filter || r.owner === filter);
+  const activeFilter = filterOwner || filter;
+  const visible = routines[period].filter(r => !activeFilter || r.owner === activeFilter);
   const cats = ["leefstijl", "huishouden", "baby"].filter(c => visible.some(r => r.cat === c));
 
   // Score
@@ -846,7 +900,7 @@ function RoutinesTab({ routines, setRoutines }) {
         {[{ id: "weekly", label: "Wekelijks", emoji: "🔥" }, { id: "monthly", label: "Maandelijks", emoji: "📅" }].map(p => (
           <button key={p.id} onClick={() => setPeriod(p.id)} style={{
             flex: 1, padding: "10px 4px 12px", border: "none", background: "none", cursor: "pointer",
-            color: period === p.id ? C.gold : "#555",
+            color: period === p.id ? C.gold : "#AAA",
             borderBottom: period === p.id ? `2.5px solid ${C.gold}` : "2.5px solid transparent",
             fontSize: 12, fontFamily: "'Georgia', serif",
           }}>{p.emoji} {p.label}</button>
@@ -910,11 +964,11 @@ function RoutinesTab({ routines, setRoutines }) {
 
         {/* Owner filter */}
         <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
-          <button onClick={() => setFilter(null)} style={{ padding: "5px 12px", borderRadius: 14, border: "none", fontSize: 11, cursor: "pointer", background: !filter ? C.dark : C.sand, color: !filter ? C.gold : C.brown, fontFamily: "'Georgia', serif" }}>Iedereen</button>
+          <button onClick={() => setFilter(null)} style={{ padding: "5px 12px", borderRadius: 14, border: "none", fontSize: 11, cursor: "pointer", background: !activeFilter ? C.dark : C.sand, color: !activeFilter ? C.gold : C.brown, fontFamily: "'Georgia', serif" }}>Iedereen</button>
           {OWNERS.filter(o => o.id !== "samen").map(o => (
-            <button key={o.id} onClick={() => setFilter(filter === o.id ? null : o.id)} style={{
-              padding: "5px 12px", borderRadius: 14, border: `1px solid ${filter === o.id ? o.color : C.sand}`,
-              background: filter === o.id ? o.bg : C.paper, color: filter === o.id ? o.color : C.muted,
+            <button key={o.id} onClick={() => setFilter(activeFilter === o.id ? null : o.id)} style={{
+              padding: "5px 12px", borderRadius: 14, border: `1px solid ${activeFilter === o.id ? o.color : C.sand}`,
+              background: activeFilter === o.id ? o.bg : C.paper, color: activeFilter === o.id ? o.color : C.muted,
               fontSize: 11, cursor: "pointer", fontFamily: "'Georgia', serif",
             }}>{o.avatar} {o.label}</button>
           ))}
@@ -1023,6 +1077,20 @@ function RecapTab({ tasks, recaps, setRecaps, setMemory }) {
   const [showSettings, setShowSettings] = useState(false);
   const [reminderDay, setReminderDay]   = useState("zondag");
   const [reminderTime, setReminderTime] = useState("09:00");
+  const [showAlert, setShowAlert] = useState(false);
+
+  // Check of het vandaag de recap dag is en recap nog niet gedaan
+  useEffect(() => {
+    const today = new Date().toLocaleDateString("nl-NL", { weekday: "long" });
+    const thisWeek = getWeekKey();
+    const alreadyDoneThisWeek = recaps.some(r => {
+      const rWeek = r.date ? `${new Date(r.date).getFullYear()}-W${Math.ceil(((new Date(r.date) - new Date(new Date(r.date).getFullYear(), 0, 1)) / 86400000 + new Date(new Date(r.date).getFullYear(), 0, 1).getDay() + 1) / 7)}` : null;
+      return rWeek === thisWeek;
+    });
+    if (today === reminderDay && !alreadyDoneThisWeek && !svenDone && !evaDone) {
+      setShowAlert(true);
+    }
+  }, [reminderDay, recaps]);
 
   const weekLabel = (() => {
     const n = new Date();
@@ -1123,6 +1191,29 @@ function RecapTab({ tasks, recaps, setRecaps, setMemory }) {
 
   return (
     <div style={{ flex: 1, overflowY: "auto", padding: "18px 18px 0" }}>
+
+      {/* Zondag alert */}
+      {showAlert && (
+        <div style={{ background: C.gold, borderRadius: 14, padding: "13px 16px", marginBottom: 16, display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 22 }}>📊</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: C.dark, fontFamily: "'Georgia', serif" }}>Recap tijd!</div>
+            <div style={{ fontSize: 11, color: C.brown }}>Jullie wekelijkse check-in staat klaar — duurt ~2 minuten.</div>
+          </div>
+          <button onClick={() => setShowAlert(false)} style={{ background: "none", border: "none", color: C.brown, cursor: "pointer", fontSize: 20 }}>×</button>
+        </div>
+      )}
+
+      {/* Settings knop — altijd zichtbaar */}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
+        <button onClick={() => setShowSettings(!showSettings)} style={{
+          padding: "7px 14px", borderRadius: 12, border: `1px solid ${C.sand}`,
+          background: showSettings ? C.dark : C.paper,
+          color: showSettings ? C.gold : C.muted,
+          fontSize: 12, cursor: "pointer", fontFamily: "'Georgia', serif",
+          display: "flex", alignItems: "center", gap: 6,
+        }}>⚙️ Herinnering instellen</button>
+      </div>
 
       {/* Settings */}
       {showSettings && (
@@ -1234,6 +1325,221 @@ function RecapTab({ tasks, recaps, setRecaps, setMemory }) {
   );
 }
 
+// ─── PROFIEL TAB ──────────────────────────────────────────────────────────────
+
+const BLUEPRINT_PILLARS = [
+  { id: "slaap",     label: "Slaap",                    emoji: "😴", attia: "7-9u per nacht, consistent ritme, koele kamer, geen schermen voor bed" },
+  { id: "bewegen",   label: "Bewegen",                  emoji: "💪", attia: "Zone 2 cardio 3-4x/week, kracht 2-3x/week, VO2max training 1x/week" },
+  { id: "voeding",   label: "Voeding",                  emoji: "🥗", attia: "Voldoende eiwit (1.6-2.2g/kg), weinig ultrabewerkt, stabiele bloedsuiker" },
+  { id: "supps",     label: "Supplementen & Medicatie", emoji: "💊", attia: "Creatine, omega-3, vitamine D3+K2, magnesium — op basis van bloedwaarden" },
+  { id: "emotioneel",label: "Emotionele Gezondheid",    emoji: "🧠", attia: "Stressmanagement, sociale verbinding, therapie/coaching, zingeving" },
+];
+
+const BLUEPRINT_KEYS = {
+  sven: "tipo-v5-blueprint-sven",
+  eva:  "tipo-v5-blueprint-eva",
+};
+
+function ProfielTab({ memory, setMemory }) {
+  const [person, setPerson]     = useState("sven");
+  const [blueprints, setBlueprints] = useState({ sven: {}, eva: {} });
+  const [editing, setEditing]   = useState(null); // pillar id
+  const [draftText, setDraftText] = useState("");
+  const [saved, setSaved]       = useState(false);
+  const [tipoContext, setTipoContext] = useState("");
+  const [editContext, setEditContext] = useState(false);
+
+  useEffect(() => {
+    Promise.all([
+      loadData(BLUEPRINT_KEYS.sven, {}),
+      loadData(BLUEPRINT_KEYS.eva, {}),
+    ]).then(([s, e]) => setBlueprints({ sven: s, eva: e }));
+  }, []);
+
+  const savePillar = () => {
+    const updated = {
+      ...blueprints,
+      [person]: { ...blueprints[person], [editing]: draftText },
+    };
+    setBlueprints(updated);
+    saveData(BLUEPRINT_KEYS[person], updated[person]);
+    setEditing(null);
+
+    // Update TIPO geheugen met blueprint context
+    const bpSummary = Object.entries(updated.sven).map(([k, v]) => {
+      const p = BLUEPRINT_PILLARS.find(x => x.id === k);
+      return v ? `Sven ${p?.label}: ${v}` : null;
+    }).filter(Boolean).join(" | ");
+    const bpEvaSummary = Object.entries(updated.eva).map(([k, v]) => {
+      const p = BLUEPRINT_PILLARS.find(x => x.id === k);
+      return v ? `Eva ${p?.label}: ${v}` : null;
+    }).filter(Boolean).join(" | ");
+
+    const newMemory = [tipoContext, bpSummary, bpEvaSummary].filter(Boolean).join("\n");
+    setMemory(newMemory);
+    saveData("tipo-v5-memory", newMemory);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const saveContext = () => {
+    const bpSven = Object.entries(blueprints.sven).map(([k, v]) => {
+      const p = BLUEPRINT_PILLARS.find(x => x.id === k);
+      return v ? `Sven ${p?.label}: ${v}` : null;
+    }).filter(Boolean).join(" | ");
+    const bpEva = Object.entries(blueprints.eva).map(([k, v]) => {
+      const p = BLUEPRINT_PILLARS.find(x => x.id === k);
+      return v ? `Eva ${p?.label}: ${v}` : null;
+    }).filter(Boolean).join(" | ");
+    const newMemory = [tipoContext, bpSven, bpEva].filter(Boolean).join("\n");
+    setMemory(newMemory);
+    saveData("tipo-v5-memory", newMemory);
+    setEditContext(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const currentBp = blueprints[person] || {};
+  const o = OWNERS.find(o => o.id === person);
+
+  return (
+    <div style={{ flex: 1, overflowY: "auto", padding: "18px 18px 40px" }}>
+
+      {/* Person switcher */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+        {["sven", "eva"].map(p => {
+          const owner = OWNERS.find(o => o.id === p);
+          const filled = Object.keys(blueprints[p] || {}).filter(k => blueprints[p][k]).length;
+          return (
+            <button key={p} onClick={() => setPerson(p)} style={{
+              flex: 1, padding: "14px", borderRadius: 16, cursor: "pointer",
+              border: `1.5px solid ${person === p ? owner.color : C.sand}`,
+              background: person === p ? owner.bg : C.paper,
+              display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
+            }}>
+              <Avatar ownerId={p} size={36} />
+              <div style={{ fontSize: 13, color: person === p ? owner.color : C.dark, fontFamily: "'Georgia', serif" }}>{owner.label}</div>
+              <div style={{ fontSize: 10, color: C.muted }}>{filled}/{BLUEPRINT_PILLARS.length} pijlers ingevuld</div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Blueprint pillars */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 9, letterSpacing: 2, color: C.muted, textTransform: "uppercase", marginBottom: 12 }}>
+          🏗 Leefstijl Blueprint — {o?.label}
+        </div>
+
+        {BLUEPRINT_PILLARS.map(pillar => {
+          const value = currentBp[pillar.id] || "";
+          const isEditing = editing === pillar.id;
+
+          return (
+            <div key={pillar.id} style={{
+              background: C.paper, borderRadius: 14, padding: "14px 16px", marginBottom: 10,
+              border: `1px solid ${value ? C.sandDark : C.sand}`,
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: isEditing ? 10 : value ? 8 : 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 20 }}>{pillar.emoji}</span>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: C.dark, fontFamily: "'Georgia', serif" }}>{pillar.label}</div>
+                    {!value && !isEditing && (
+                      <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>Nog niet ingevuld</div>
+                    )}
+                  </div>
+                </div>
+                <button onClick={() => { setEditing(isEditing ? null : pillar.id); setDraftText(value); }} style={{
+                  padding: "5px 12px", borderRadius: 10, border: `1px solid ${C.sand}`,
+                  background: "none", color: C.muted, fontSize: 11, cursor: "pointer",
+                }}>{isEditing ? "Annuleer" : value ? "Bewerk" : "Invullen"}</button>
+              </div>
+
+              {/* Attia hint */}
+              {!value && !isEditing && (
+                <div style={{ fontSize: 11, color: C.sandDark, fontStyle: "italic", lineHeight: 1.5, marginTop: 6 }}>
+                  💡 Attia: {pillar.attia}
+                </div>
+              )}
+
+              {/* Current value */}
+              {value && !isEditing && (
+                <div style={{ fontSize: 13, color: C.brown, lineHeight: 1.6, fontFamily: "'Georgia', serif" }}>{value}</div>
+              )}
+
+              {/* Edit mode */}
+              {isEditing && (
+                <div>
+                  <div style={{ fontSize: 11, color: C.sandDark, fontStyle: "italic", marginBottom: 8, lineHeight: 1.5 }}>
+                    💡 {pillar.attia}
+                  </div>
+                  <textarea
+                    autoFocus
+                    value={draftText}
+                    onChange={e => setDraftText(e.target.value)}
+                    placeholder={`Beschrijf ${o?.label}'s protocol voor ${pillar.label.toLowerCase()}...`}
+                    rows={3}
+                    style={{
+                      width: "100%", padding: "10px 12px", borderRadius: 10,
+                      border: `1.5px solid ${o?.color}`, fontSize: 13,
+                      fontFamily: "'Georgia', serif", color: C.dark, outline: "none",
+                      resize: "none", lineHeight: 1.6, background: "white", boxSizing: "border-box",
+                    }}
+                  />
+                  <button onClick={savePillar} style={{
+                    marginTop: 8, padding: "8px 18px", borderRadius: 10, border: "none",
+                    background: o?.color, color: "white", fontSize: 13, cursor: "pointer", fontWeight: 700,
+                  }}>Opslaan {saved ? "✓" : ""}</button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* TIPO Context — extra vrije tekst */}
+      <div style={{ background: C.dark, borderRadius: 16, padding: "16px 18px", marginBottom: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+          <div style={{ fontSize: 9, letterSpacing: 2, color: C.gold, textTransform: "uppercase" }}>✦ Extra TIPO Context</div>
+          <button onClick={() => { setEditContext(!editContext); setTipoContext(memory.split("\n")[0] || ""); }} style={{
+            padding: "5px 12px", borderRadius: 10, border: "none",
+            background: editContext ? "#333" : C.gold, color: editContext ? "#AAA" : C.dark,
+            fontSize: 11, cursor: "pointer",
+          }}>{editContext ? "Annuleer" : "Bewerk"}</button>
+        </div>
+        {editContext ? (
+          <div>
+            <textarea
+              value={tipoContext}
+              onChange={e => setTipoContext(e.target.value)}
+              placeholder="Extra context voor TIPO — bijv. huidige medicatie, medische aandoeningen, persoonlijke doelen, allergieën..."
+              rows={4}
+              style={{
+                width: "100%", padding: "10px 12px", borderRadius: 10,
+                border: "none", background: "#2A2218", color: "#E8E0D0", fontSize: 13,
+                fontFamily: "'Georgia', serif", outline: "none", resize: "none",
+                lineHeight: 1.6, boxSizing: "border-box",
+              }}
+            />
+            <button onClick={saveContext} style={{
+              marginTop: 8, padding: "8px 18px", borderRadius: 10, border: "none",
+              background: C.gold, color: C.dark, fontSize: 13, cursor: "pointer", fontWeight: 700,
+            }}>Opslaan</button>
+          </div>
+        ) : (
+          <div style={{ fontSize: 13, color: memory ? "#C8C0B0" : "#555", lineHeight: 1.6, fontFamily: "'Georgia', serif" }}>
+            {memory ? memory.slice(0, 200) + (memory.length > 200 ? "..." : "") : "Nog geen extra context. Tik op Bewerk om toe te voegen."}
+          </div>
+        )}
+        <div style={{ fontSize: 10, color: "#555", marginTop: 8 }}>
+          Dit wordt automatisch meegestuurd bij elk TIPO gesprek.
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [tab, setTab]           = useState("taken");
@@ -1243,10 +1549,13 @@ export default function App() {
   const [recaps, setRecaps]     = useState([]);
   const [memory, setMemory]     = useState("");
   const [loading, setLoading]   = useState(true);
+  const [editBabyDate, setEditBabyDate] = useState(false);
+  const [babyDateStr, setBabyDateStr]   = useState("2026-09-01");
 
   // Baby countdown
-  const babyDate = new Date("2025-09-01");
+  const babyDate = new Date(babyDateStr);
   const daysLeft = Math.max(0, Math.ceil((babyDate - new Date()) / 86400000));
+  const babyBorn = new Date() > babyDate;
 
   useEffect(() => {
     Promise.all([
@@ -1286,26 +1595,45 @@ export default function App() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 400, color: "#F5F0E8", letterSpacing: -0.5 }}>TIPO Brain</h1>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {daysLeft > 0 && (
-              <div style={{ background: "#2A2218", borderRadius: 12, padding: "5px 10px", textAlign: "center" }}>
+            {!babyBorn && daysLeft > 0 && (
+              <div onClick={() => setEditBabyDate(!editBabyDate)}
+                style={{ background: "#2A2218", borderRadius: 12, padding: "5px 10px", textAlign: "center", cursor: "pointer" }}
+                title="Tik om datum aan te passen"
+              >
                 <div style={{ fontSize: 14, color: C.gold, fontWeight: 700, fontFamily: "monospace" }}>{daysLeft}</div>
-                <div style={{ fontSize: 8, color: "#555", letterSpacing: 1 }}>DAGEN</div>
+                <div style={{ fontSize: 8, color: "#555", letterSpacing: 1 }}>👶 DAGEN</div>
               </div>
             )}
-            <span style={{ color: "#444", fontSize: 12 }}>{openCount} open</span>
+            {babyBorn && (
+              <div style={{ background: "#2A2218", borderRadius: 12, padding: "5px 10px", textAlign: "center" }}>
+                <div style={{ fontSize: 16 }}>👶</div>
+                <div style={{ fontSize: 8, color: C.gold, letterSpacing: 1 }}>GEBOREN!</div>
+              </div>
+            )}
+            {editBabyDate && (
+              <div style={{ position: "absolute", top: 60, right: 16, background: C.dark, borderRadius: 14, padding: "12px 14px", zIndex: 50, border: `1px solid ${C.gold}44`, boxShadow: "0 4px 20px rgba(0,0,0,0.4)" }}>
+                <div style={{ fontSize: 10, color: C.gold, letterSpacing: 2, marginBottom: 8 }}>👶 UITGEREKENDE DATUM</div>
+                <input type="date" value={babyDateStr} onChange={e => setBabyDateStr(e.target.value)}
+                  style={{ padding: "8px 12px", borderRadius: 10, border: `1px solid ${C.gold}44`, background: "#2A2218", color: "#E8E0D0", fontSize: 13, outline: "none", fontFamily: "monospace" }}
+                />
+                <button onClick={() => setEditBabyDate(false)} style={{ marginTop: 8, width: "100%", padding: "7px", borderRadius: 9, border: "none", background: C.gold, color: C.dark, fontSize: 12, cursor: "pointer", fontWeight: 700 }}>Opslaan</button>
+              </div>
+            )}
+            <span style={{ color: "#AAA", fontSize: 12 }}>{openCount} open</span>
           </div>
         </div>
 
         {/* Owner filter */}
         <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
-          <button onClick={() => setFilterOwner(null)} style={{ padding: "4px 11px", borderRadius: 14, border: "none", fontSize: 11, cursor: "pointer", background: !filterOwner ? "#3A3528" : "transparent", color: !filterOwner ? "#F5F0E8" : "#555", fontFamily: "'Georgia', serif" }}>Iedereen</button>
+          <button onClick={() => setFilterOwner(null)} style={{ padding: "5px 13px", borderRadius: 14, border: "none", fontSize: 12, cursor: "pointer", background: !filterOwner ? "#3A3528" : "transparent", color: !filterOwner ? "#F5F0E8" : "#888", fontFamily: "'Georgia', serif" }}>Iedereen</button>
           {OWNERS.map(o => (
             <button key={o.id} onClick={() => setFilterOwner(filterOwner === o.id ? null : o.id)} style={{
-              padding: "4px 11px", borderRadius: 14, border: `1px solid ${filterOwner === o.id ? o.color : "#333"}`,
+              padding: "5px 13px", borderRadius: 14,
+              border: `1px solid ${filterOwner === o.id ? o.color : "#444"}`,
               background: filterOwner === o.id ? o.bg : "transparent",
-              color: filterOwner === o.id ? o.color : "#555",
-              fontSize: 11, cursor: "pointer", fontFamily: "'Georgia', serif",
-            }}>{o.avatar} {o.label}</button>
+              color: filterOwner === o.id ? o.color : "#999",
+              fontSize: 12, cursor: "pointer", fontFamily: "'Georgia', serif",
+            }}>{o.label}</button>
           ))}
         </div>
 
@@ -1315,12 +1643,13 @@ export default function App() {
             { id: "taken",    label: "Taken",    emoji: "✓" },
             { id: "routines", label: "Routines", emoji: "🔄" },
             { id: "recap",    label: "Recap",    emoji: "📊" },
+            { id: "profiel",  label: "Profiel",  emoji: "👤" },
           ].map(t => (
             <button key={t.id} onClick={() => setTab(t.id)} style={{
               flex: 1, padding: "10px 4px 12px", border: "none", background: "none", cursor: "pointer",
-              color: tab === t.id ? C.gold : "#555",
+              color: tab === t.id ? C.gold : "#AAA",
               borderBottom: tab === t.id ? `2.5px solid ${C.gold}` : "2.5px solid transparent",
-              fontSize: 12, fontFamily: "'Georgia', serif",
+              fontSize: 11, fontFamily: "'Georgia', serif",
             }}>{t.emoji} {t.label}</button>
           ))}
         </div>
@@ -1328,9 +1657,10 @@ export default function App() {
 
       {/* Tab content */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        {tab === "taken"    && <TasksTab tasks={tasks} setTasks={setTasks} memory={memory} />}
-        {tab === "routines" && <RoutinesTab routines={routines} setRoutines={setRoutines} />}
+        {tab === "taken"    && <TasksTab tasks={tasks} setTasks={setTasks} memory={memory} filterOwner={filterOwner} />}
+        {tab === "routines" && <RoutinesTab routines={routines} setRoutines={setRoutines} filterOwner={filterOwner} />}
         {tab === "recap"    && <RecapTab tasks={tasks} recaps={recaps} setRecaps={setRecaps} setMemory={setMemory} />}
+        {tab === "profiel"  && <ProfielTab memory={memory} setMemory={setMemory} />}
       </div>
 
       <style>{`
@@ -1341,6 +1671,3 @@ export default function App() {
     </div>
   );
 }
-
-const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(React.createElement(App));
