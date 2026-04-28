@@ -185,11 +185,12 @@ Als de gebruiker acties wil, voeg een <actions> blok toe aan het EINDE:
   { "type": "delete", "id": 123 },
   { "type": "move", "id": 123, "list": "ooit" },
   { "type": "set_owner", "id": 123, "owner": "eva" },
-  { "type": "update_notes", "id": 123, "notes": "..." }
+  { "type": "update_notes", "id": 123, "notes": "..." },
+  { "type": "add_milestones", "id": 123, "milestones": [{"text": "stap 1", "owner": "sven"}, {"text": "stap 2", "owner": "eva"}] }
 ]
 </actions>
 
-Reageer altijd in het Nederlands. Wees warm, concreet en beknopt. Je kent Peter Attia's principes (Zone 2, kracht, slaap, voeding) en GTD/Tiny Habits methodieken.`;
+Gebruik add_milestones als de gebruiker vraagt om stappen, mijlpalen of een stappenplan bij een bestaande taak. De id is het taaknummer uit de takenlijst hierboven. Bij een nieuwe taak: maak eerst de taak aan met "add", geef die taak een logische id (gebruik het volgende vrije nummer), en voeg dan direct add_milestones toe met datzelfde id. Reageer altijd in het Nederlands. Wees warm, concreet en beknopt. Je kent Peter Attia's principes (Zone 2, kracht, slaap, voeding) en GTD/Tiny Habits methodieken.`;
 
   const text = await callClaude(messages, system);
   const match = text.match(/<actions>([\s\S]*?)<\/actions>/);
@@ -199,11 +200,32 @@ Reageer altijd in het Nederlands. Wees warm, concreet en beknopt. Je kent Peter 
 }
 
 async function prepareTask(task) {
-  const system = `Je bent TIPO, assistent van Sven en Eva (baby verwacht september 2026). Bereid taken concreet voor: ideeën, bronnen, stappenplan, aandachtspunten. Gebruik Markdown (##, -, **bold**). Max 350 woorden. Schrijf in het Nederlands.`;
-  return callClaude(
+  const system = `Je bent TIPO, assistent van Sven en Eva (baby verwacht september 2026).
+
+Geef een JSON response met EXACT deze structuur (geen markdown, geen extra tekst):
+{
+  "samenvatting": "2-3 zinnen over wat deze taak inhoudt en waarom het belangrijk is",
+  "aandachtspunten": ["punt 1", "punt 2", "punt 3"],
+  "bronnen": ["bron of tip 1", "bron of tip 2"],
+  "milestones": [
+    {"text": "concrete stap 1", "owner": "sven|eva|samen"},
+    {"text": "concrete stap 2", "owner": "sven|eva|samen"}
+  ]
+}
+
+Geef 3-6 concrete, afvinkbare milestones. Wijs eigenaren toe op basis van wie er logisch verantwoordelijk voor is (sven/eva/samen). Schrijf in het Nederlands.`;
+
+  const raw = await callClaude(
     [{ role: "user", content: `Bereid voor: "${task.text}"\n\nContext: ${task.notes || "geen"}` }],
     system, 1200
   );
+  try {
+    const clean = raw.replace(/```json|```/g, "").trim();
+    return JSON.parse(clean);
+  } catch (_) {
+    // Fallback: return as text content
+    return { samenvatting: raw, aandachtspunten: [], bronnen: [], milestones: [] };
+  }
 }
 
 async function generateRecapInsight(svenAnswers, evaAnswers, tasks) {
@@ -311,20 +333,74 @@ function MilestoneEditor({ milestones, onChange, color }) {
   );
 }
 
-function AIContent({ content, loading, color }) {
+function AIContent({ content, loading, color, onAddMilestones }) {
   if (loading) return (
     <div style={{ display: "flex", gap: 5, padding: "14px 0" }}>
       {[0,1,2].map(i => <div key={i} style={{ width: 6, height: 6, borderRadius: "50%", background: color, animation: `tipoFade 1.2s ${i*0.2}s infinite` }} />)}
     </div>
   );
   if (!content) return null;
+
+  // Structured JSON format
+  if (typeof content === "object" && content.samenvatting) {
+    return (
+      <div style={{ fontSize: 13, lineHeight: 1.7 }}>
+        {/* Samenvatting */}
+        <div style={{ color: "#E8E4DC", marginBottom: 12 }}>{content.samenvatting}</div>
+
+        {/* Aandachtspunten */}
+        {content.aandachtspunten?.length > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 9, letterSpacing: 2, color: color, textTransform: "uppercase", marginBottom: 6 }}>Aandachtspunten</div>
+            {content.aandachtspunten.map((p, i) => (
+              <div key={i} style={{ color: "#D0CAC0", paddingLeft: 12, marginBottom: 3 }}>· {p}</div>
+            ))}
+          </div>
+        )}
+
+        {/* Bronnen */}
+        {content.bronnen?.length > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 9, letterSpacing: 2, color: color, textTransform: "uppercase", marginBottom: 6 }}>Bronnen & Tips</div>
+            {content.bronnen.map((b, i) => (
+              <div key={i} style={{ color: "#D0CAC0", paddingLeft: 12, marginBottom: 3 }}>· {b}</div>
+            ))}
+          </div>
+        )}
+
+        {/* Voorgestelde milestones */}
+        {content.milestones?.length > 0 && (
+          <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: 12, padding: "12px 14px", marginTop: 4 }}>
+            <div style={{ fontSize: 9, letterSpacing: 2, color: color, textTransform: "uppercase", marginBottom: 10 }}>🎯 Voorgestelde mijlpalen</div>
+            {content.milestones.map((m, i) => {
+              const o = OWNERS.find(o => o.id === m.owner) || OWNERS[2];
+              return (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <div style={{ width: 18, height: 18, borderRadius: 4, border: "1.5px solid #555", flexShrink: 0 }} />
+                  <span style={{ flex: 1, color: "#D0CAC0", fontSize: 13 }}>{m.text}</span>
+                  <span style={{ fontSize: 10, color: o.color, background: `${o.color}22`, padding: "2px 7px", borderRadius: 8 }}>{o.label}</span>
+                </div>
+              );
+            })}
+            <button onClick={() => onAddMilestones(content.milestones)} style={{
+              marginTop: 10, width: "100%", padding: "9px", borderRadius: 10, border: "none",
+              background: color, color: "#1E1A14", fontSize: 12, fontWeight: 700, cursor: "pointer",
+              fontFamily: "'Georgia', serif",
+            }}>✓ Voeg alle mijlpalen toe</button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Fallback: plain text
   return (
     <div style={{ fontSize: 13, color: "#E8E4DC", lineHeight: 1.75 }}>
-      {content.split("\n").map((line, i) => {
+      {String(content).split("\n").map((line, i) => {
         if (line.startsWith("## ")) return <div key={i} style={{ fontWeight: 700, fontSize: 14, color: C.goldLight, marginTop: 14, marginBottom: 5 }}>{line.slice(3)}</div>;
-        if (line.startsWith("- ")) return <div key={i} style={{ paddingLeft: 14, marginBottom: 3, color: "#D0CAC0" }}>· {line.slice(2).replace(/\*\*(.*?)\*\*/g, "$1")}</div>;
+        if (line.startsWith("- ")) return <div key={i} style={{ paddingLeft: 14, marginBottom: 3, color: "#D0CAC0" }}>· {line.slice(2)}</div>;
         if (!line.trim()) return <div key={i} style={{ height: 8 }} />;
-        return <div key={i} style={{ marginBottom: 3 }}>{line.replace(/\*\*(.*?)\*\*/g, "$1")}</div>;
+        return <div key={i} style={{ marginBottom: 3 }}>{line}</div>;
       })}
     </div>
   );
@@ -398,6 +474,19 @@ function TasksTab({ tasks, setTasks, memory, filterOwner }) {
       else if (a.type === "move")         updated = updated.map(t => t.id === a.id ? { ...t, list: a.list } : t);
       else if (a.type === "set_owner")    updated = updated.map(t => t.id === a.id ? { ...t, owner: a.owner } : t);
       else if (a.type === "update_notes") updated = updated.map(t => t.id === a.id ? { ...t, notes: a.notes } : t);
+      else if (a.type === "add_milestones") {
+        const newMs = (a.milestones || []).map(m => ({
+          id: `m${nextMid++}`, text: m.text, done: false, owner: m.owner || "samen"
+        }));
+        // Zoek op id — als de taak net aangemaakt is, pak dan de laatste toegevoegde
+        const target = updated.find(t => t.id === a.id) || updated[updated.length - 1];
+        if (target) {
+          updated = updated.map(t => t.id === target.id
+            ? { ...t, milestones: [...(t.milestones || []), ...newMs] }
+            : t
+          );
+        }
+      }
     }
     return updated;
   };
@@ -727,7 +816,20 @@ function TasksTab({ tasks, setTasks, memory, filterOwner }) {
                     fontSize: 11, cursor: aiLoading ? "default" : "pointer", fontFamily: "'Georgia', serif", fontWeight: 700,
                   }}>{aiLoading ? "Laden..." : detailItem.aiContent ? "Ververs" : "Bereid voor"}</button>
                 </div>
-                {(detailItem.aiContent || aiLoading) && <AIContent content={detailItem.aiContent} loading={aiLoading} color={C.gold} />}
+                {(detailItem.aiContent || aiLoading) && <AIContent
+                  content={detailItem.aiContent}
+                  loading={aiLoading}
+                  color={C.gold}
+                  onAddMilestones={(suggestions) => {
+                    const newMs = suggestions.map(m => ({
+                      id: `m${nextMid++}`, text: m.text, done: false, owner: m.owner || "samen"
+                    }));
+                    setTasks(prev => prev.map(t => t.id === detailItem.id
+                      ? { ...t, milestones: [...(t.milestones || []), ...newMs] }
+                      : t
+                    ));
+                  }}
+                />
                 {!detailItem.aiContent && !aiLoading && <div style={{ fontSize: 12, color: "#555", fontFamily: "'Georgia', serif" }}>Laat TIPO ideeën, bronnen en stappen genereren.</div>}
               </div>
 
@@ -1349,12 +1451,29 @@ function ProfielTab({ memory, setMemory }) {
   const [tipoContext, setTipoContext] = useState("");
   const [editContext, setEditContext] = useState(false);
 
+  // Laad vrije context apart
+  useEffect(() => {
+    loadData("tipo-v5-extra-context", "").then(setTipoContext);
+  }, []);
+
   useEffect(() => {
     Promise.all([
       loadData(BLUEPRINT_KEYS.sven, {}),
       loadData(BLUEPRINT_KEYS.eva, {}),
     ]).then(([s, e]) => setBlueprints({ sven: s, eva: e }));
   }, []);
+
+  const buildMemory = (updatedBlueprints, extraContext) => {
+    const bpSven = Object.entries(updatedBlueprints.sven || {}).map(([k, v]) => {
+      const p = BLUEPRINT_PILLARS.find(x => x.id === k);
+      return v ? `Sven ${p?.label}: ${v}` : null;
+    }).filter(Boolean).join(" | ");
+    const bpEva = Object.entries(updatedBlueprints.eva || {}).map(([k, v]) => {
+      const p = BLUEPRINT_PILLARS.find(x => x.id === k);
+      return v ? `Eva ${p?.label}: ${v}` : null;
+    }).filter(Boolean).join(" | ");
+    return [extraContext, bpSven, bpEva].filter(Boolean).join("\n");
+  };
 
   const savePillar = () => {
     const updated = {
@@ -1364,18 +1483,7 @@ function ProfielTab({ memory, setMemory }) {
     setBlueprints(updated);
     saveData(BLUEPRINT_KEYS[person], updated[person]);
     setEditing(null);
-
-    // Update TIPO geheugen met blueprint context
-    const bpSummary = Object.entries(updated.sven).map(([k, v]) => {
-      const p = BLUEPRINT_PILLARS.find(x => x.id === k);
-      return v ? `Sven ${p?.label}: ${v}` : null;
-    }).filter(Boolean).join(" | ");
-    const bpEvaSummary = Object.entries(updated.eva).map(([k, v]) => {
-      const p = BLUEPRINT_PILLARS.find(x => x.id === k);
-      return v ? `Eva ${p?.label}: ${v}` : null;
-    }).filter(Boolean).join(" | ");
-
-    const newMemory = [tipoContext, bpSummary, bpEvaSummary].filter(Boolean).join("\n");
+    const newMemory = buildMemory(updated, tipoContext);
     setMemory(newMemory);
     saveData("tipo-v5-memory", newMemory);
     setSaved(true);
@@ -1383,15 +1491,8 @@ function ProfielTab({ memory, setMemory }) {
   };
 
   const saveContext = () => {
-    const bpSven = Object.entries(blueprints.sven).map(([k, v]) => {
-      const p = BLUEPRINT_PILLARS.find(x => x.id === k);
-      return v ? `Sven ${p?.label}: ${v}` : null;
-    }).filter(Boolean).join(" | ");
-    const bpEva = Object.entries(blueprints.eva).map(([k, v]) => {
-      const p = BLUEPRINT_PILLARS.find(x => x.id === k);
-      return v ? `Eva ${p?.label}: ${v}` : null;
-    }).filter(Boolean).join(" | ");
-    const newMemory = [tipoContext, bpSven, bpEva].filter(Boolean).join("\n");
+    saveData("tipo-v5-extra-context", tipoContext);
+    const newMemory = buildMemory(blueprints, tipoContext);
     setMemory(newMemory);
     saveData("tipo-v5-memory", newMemory);
     setEditContext(false);
@@ -1502,7 +1603,7 @@ function ProfielTab({ memory, setMemory }) {
       <div style={{ background: C.dark, borderRadius: 16, padding: "16px 18px", marginBottom: 20 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
           <div style={{ fontSize: 9, letterSpacing: 2, color: C.gold, textTransform: "uppercase" }}>✦ Extra TIPO Context</div>
-          <button onClick={() => { setEditContext(!editContext); setTipoContext(memory.split("\n")[0] || ""); }} style={{
+          <button onClick={() => setEditContext(!editContext)} style={{
             padding: "5px 12px", borderRadius: 10, border: "none",
             background: editContext ? "#333" : C.gold, color: editContext ? "#AAA" : C.dark,
             fontSize: 11, cursor: "pointer",
@@ -1513,7 +1614,7 @@ function ProfielTab({ memory, setMemory }) {
             <textarea
               value={tipoContext}
               onChange={e => setTipoContext(e.target.value)}
-              placeholder="Extra context voor TIPO — bijv. huidige medicatie, medische aandoeningen, persoonlijke doelen, allergieën..."
+              placeholder="Extra context voor TIPO — bijv. knieblessure links, medicatie, persoonlijke doelen, allergieën, zwangerschap details..."
               rows={4}
               style={{
                 width: "100%", padding: "10px 12px", borderRadius: 10,
@@ -1525,15 +1626,15 @@ function ProfielTab({ memory, setMemory }) {
             <button onClick={saveContext} style={{
               marginTop: 8, padding: "8px 18px", borderRadius: 10, border: "none",
               background: C.gold, color: C.dark, fontSize: 13, cursor: "pointer", fontWeight: 700,
-            }}>Opslaan</button>
+            }}>{saved ? "Opgeslagen ✓" : "Opslaan"}</button>
           </div>
         ) : (
-          <div style={{ fontSize: 13, color: memory ? "#C8C0B0" : "#555", lineHeight: 1.6, fontFamily: "'Georgia', serif" }}>
-            {memory ? memory.slice(0, 200) + (memory.length > 200 ? "..." : "") : "Nog geen extra context. Tik op Bewerk om toe te voegen."}
+          <div style={{ fontSize: 13, color: tipoContext ? "#C8C0B0" : "#555", lineHeight: 1.6, fontFamily: "'Georgia', serif" }}>
+            {tipoContext || "Nog geen extra context. Gebruik dit voor medische info, blessures, persoonlijke doelen die niet in de Blueprint passen."}
           </div>
         )}
         <div style={{ fontSize: 10, color: "#555", marginTop: 8 }}>
-          Dit wordt automatisch meegestuurd bij elk TIPO gesprek.
+          Wordt samen met je Blueprint meegestuurd bij elk TIPO gesprek.
         </div>
       </div>
     </div>
@@ -1671,6 +1772,3 @@ export default function App() {
     </div>
   );
 }
-
-const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(React.createElement(App));
