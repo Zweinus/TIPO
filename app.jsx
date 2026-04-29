@@ -28,38 +28,42 @@ const C = {
 
 // ─── Rocky SVG ────────────────────────────────────────────────────────────────
 const RockyIcon = ({ size = 52 }) => (
-  <svg width={size} height={size} viewBox="0 0 400 400" style={{ display: "block" }}>
-    <polygon fill="#3D2818" points="148,272 132,268 100,320 114,326"/>
-    <polygon fill="#523520" points="146,270 134,268 104,318 114,324"/>
-    <line stroke="#0E0804" strokeWidth="2" x1="148" y1="272" x2="104" y2="322"/>
-    <polygon fill="#3D2818" points="252,272 268,268 300,320 286,326"/>
-    <polygon fill="#523520" points="254,270 266,268 296,318 286,324"/>
-    <line stroke="#0E0804" strokeWidth="2" x1="252" y1="272" x2="296" y2="322"/>
-    <polygon fill="#3D2818" points="132,220 112,208 72,238 82,252"/>
-    <polygon fill="#523520" points="134,222 115,210 76,238 84,250"/>
-    <line stroke="#0E0804" strokeWidth="2" x1="134" y1="220" x2="76" y2="246"/>
-    <polygon fill="#3D2818" points="268,220 288,208 328,238 318,252"/>
-    <polygon fill="#523520" points="266,222 285,210 324,238 316,250"/>
-    <line stroke="#0E0804" strokeWidth="2" x1="266" y1="220" x2="324" y2="246"/>
-    <polygon fill="#3D2818" points="184,302 216,302 220,358 200,364 180,358"/>
-    <polygon fill="#523520" points="186,304 214,304 217,355 200,360 183,355"/>
-    <line stroke="#0E0804" strokeWidth="2" x1="184" y1="304" x2="180" y2="362"/>
-    <line stroke="#0E0804" strokeWidth="2" x1="216" y1="304" x2="220" y2="362"/>
-    <polygon fill="#2E1C0E" points="112,288 124,186 200,148 276,186 288,288 258,316 200,322 142,316"/>
-    <polygon fill="#523520" points="124,288 136,220 200,240 190,308 148,308"/>
-    <polygon fill="#3D2818" points="276,288 264,220 200,240 210,308 252,308"/>
-    <polygon fill="#6A4530" points="136,220 152,168 200,176 200,240"/>
-    <polygon fill="#523520" points="264,220 248,168 200,176 200,240"/>
-    <polygon fill="#855840" points="152,168 178,148 200,158 200,178 168,186"/>
-    <polygon fill="#6A4530" points="248,168 222,148 200,158 200,178 232,186"/>
-    <polygon fill="#A07050" points="178,148 200,136 222,148 216,164 200,168 184,164"/>
-    <line stroke="#0E0804" strokeWidth="2.5" x1="200" y1="138" x2="200" y2="242" strokeLinecap="round"/>
-    <line stroke="#0E0804" strokeWidth="1.8" x1="200" y1="242" x2="196" y2="308" strokeLinecap="round"/>
-    <line stroke="#0E0804" strokeWidth="1.5" x1="152" y1="170" x2="168" y2="220" strokeLinecap="round"/>
-    <line stroke="#0E0804" strokeWidth="1.5" x1="248" y1="170" x2="232" y2="220" strokeLinecap="round"/>
-    <line stroke="#0E0804" strokeWidth="1.2" x1="168" y1="220" x2="178" y2="268" strokeLinecap="round"/>
-    <line stroke="#0E0804" strokeWidth="1.2" x1="232" y1="220" x2="222" y2="268" strokeLinecap="round"/>
-    <polygon fill="none" stroke="#0E0804" strokeWidth="3" strokeLinejoin="round"
+  <svg width={size} height={size} viewBox="60 120 280 270" style={{ display: "block" }}>
+    {/* Poten */}
+    <polygon fill="#7A5A1A" points="148,272 132,268 100,320 114,326"/>
+    <polygon fill="#A07828" points="146,270 134,268 104,318 114,324"/>
+    <line stroke="#3A2A08" strokeWidth="2" x1="148" y1="272" x2="104" y2="322"/>
+    <polygon fill="#7A5A1A" points="252,272 268,268 300,320 286,326"/>
+    <polygon fill="#A07828" points="254,270 266,268 296,318 286,324"/>
+    <line stroke="#3A2A08" strokeWidth="2" x1="252" y1="272" x2="296" y2="322"/>
+    <polygon fill="#7A5A1A" points="132,220 112,208 72,238 82,252"/>
+    <polygon fill="#A07828" points="134,222 115,210 76,238 84,250"/>
+    <line stroke="#3A2A08" strokeWidth="2" x1="134" y1="220" x2="76" y2="246"/>
+    <polygon fill="#7A5A1A" points="268,220 288,208 328,238 318,252"/>
+    <polygon fill="#A07828" points="266,222 285,210 324,238 316,250"/>
+    <line stroke="#3A2A08" strokeWidth="2" x1="266" y1="220" x2="324" y2="246"/>
+    <polygon fill="#7A5A1A" points="184,302 216,302 220,358 200,364 180,358"/>
+    <polygon fill="#A07828" points="186,304 214,304 217,355 200,360 183,355"/>
+    <line stroke="#3A2A08" strokeWidth="2" x1="184" y1="304" x2="180" y2="362"/>
+    <line stroke="#3A2A08" strokeWidth="2" x1="216" y1="304" x2="220" y2="362"/>
+    {/* Lichaam */}
+    <polygon fill="#5A4010" points="112,288 124,186 200,148 276,186 288,288 258,316 200,322 142,316"/>
+    <polygon fill="#A07828" points="124,288 136,220 200,240 190,308 148,308"/>
+    <polygon fill="#8A6820" points="276,288 264,220 200,240 210,308 252,308"/>
+    <polygon fill="#C9A96E" points="136,220 152,168 200,176 200,240"/>
+    <polygon fill="#A07828" points="264,220 248,168 200,176 200,240"/>
+    <polygon fill="#E8C87A" points="152,168 178,148 200,158 200,178 168,186"/>
+    <polygon fill="#C9A96E" points="248,168 222,148 200,158 200,178 232,186"/>
+    <polygon fill="#F0D898" points="178,148 200,136 222,148 216,164 200,168 184,164"/>
+    {/* Barsten */}
+    <line stroke="#3A2A08" strokeWidth="2.5" x1="200" y1="138" x2="200" y2="242" strokeLinecap="round"/>
+    <line stroke="#3A2A08" strokeWidth="1.8" x1="200" y1="242" x2="196" y2="308" strokeLinecap="round"/>
+    <line stroke="#3A2A08" strokeWidth="1.5" x1="152" y1="170" x2="168" y2="220" strokeLinecap="round"/>
+    <line stroke="#3A2A08" strokeWidth="1.5" x1="248" y1="170" x2="232" y2="220" strokeLinecap="round"/>
+    <line stroke="#3A2A08" strokeWidth="1.2" x1="168" y1="220" x2="178" y2="268" strokeLinecap="round"/>
+    <line stroke="#3A2A08" strokeWidth="1.2" x1="232" y1="220" x2="222" y2="268" strokeLinecap="round"/>
+    {/* Buitenlijn */}
+    <polygon fill="none" stroke="#3A2A08" strokeWidth="3" strokeLinejoin="round"
       points="112,288 124,186 200,136 276,186 288,288 258,316 200,322 142,316"/>
   </svg>
 );
@@ -1017,14 +1021,25 @@ function ProfielTab({ memory, setMemory, dna, setDna }) {
   const [person, setPerson] = useState("sven");
   const [blueprints, setBlueprints] = useState({ sven: {}, eva: {} });
   const [editing, setEditing] = useState(null); const [draftText, setDraftText] = useState(""); const [saved, setSaved] = useState(false);
-  const [tipoContext, setTipoContext] = useState(""); const [editContext, setEditContext] = useState(false);
+  const [tipoContexts, setTipoContexts] = useState({ sven: "", eva: "" });
+  const [editContext, setEditContext] = useState(false);
 
-  useEffect(() => { loadData("tipo-v5-extra-context", "").then(setTipoContext); }, []);
+  useEffect(() => {
+    Promise.all([loadData("tipo-v8-context-sven", ""), loadData("tipo-v8-context-eva", "")])
+      .then(([s, e]) => setTipoContexts({ sven: s, eva: e }));
+  }, []);
   useEffect(() => { Promise.all([loadData(BLUEPRINT_KEYS.sven, {}), loadData(BLUEPRINT_KEYS.eva, {})]).then(([s, e]) => setBlueprints({ sven: s, eva: e })); }, []);
 
-  const buildMemory = (bp, ctx) => { const bs = Object.entries(bp.sven || {}).map(([k, v]) => { const p = BLUEPRINT_PILLARS.find(x => x.id === k); return v ? `Sven ${p?.label}: ${v}` : null; }).filter(Boolean).join(" | "); const be = Object.entries(bp.eva || {}).map(([k, v]) => { const p = BLUEPRINT_PILLARS.find(x => x.id === k); return v ? `Eva ${p?.label}: ${v}` : null; }).filter(Boolean).join(" | "); return [ctx, bs, be].filter(Boolean).join("\n"); };
-  const savePillar = () => { const upd = { ...blueprints, [person]: { ...blueprints[person], [editing]: draftText } }; setBlueprints(upd); saveData(BLUEPRINT_KEYS[person], upd[person]); setEditing(null); const nm = buildMemory(upd, tipoContext); setMemory(nm); saveData("tipo-v5-memory", nm); setSaved(true); setTimeout(() => setSaved(false), 2000); };
-  const saveContext = () => { saveData("tipo-v5-extra-context", tipoContext); const nm = buildMemory(blueprints, tipoContext); setMemory(nm); saveData("tipo-v5-memory", nm); setEditContext(false); setSaved(true); setTimeout(() => setSaved(false), 2000); };
+  const tipoContext = tipoContexts[person] || "";
+  const setTipoContext = (val) => setTipoContexts(prev => ({ ...prev, [person]: val }));
+
+  const buildMemory = (bp, ctxs) => {
+    const bs = Object.entries(bp.sven || {}).map(([k, v]) => { const p = BLUEPRINT_PILLARS.find(x => x.id === k); return v ? `Sven ${p?.label}: ${v}` : null; }).filter(Boolean).join(" | ");
+    const be = Object.entries(bp.eva  || {}).map(([k, v]) => { const p = BLUEPRINT_PILLARS.find(x => x.id === k); return v ? `Eva ${p?.label}: ${v}` : null; }).filter(Boolean).join(" | ");
+    return [ctxs.sven ? `Sven extra: ${ctxs.sven}` : null, ctxs.eva ? `Eva extra: ${ctxs.eva}` : null, bs, be].filter(Boolean).join("\n");
+  };
+  const savePillar = () => { const upd = { ...blueprints, [person]: { ...blueprints[person], [editing]: draftText } }; setBlueprints(upd); saveData(BLUEPRINT_KEYS[person], upd[person]); setEditing(null); const nm = buildMemory(upd, tipoContexts); setMemory(nm); saveData("tipo-v5-memory", nm); setSaved(true); setTimeout(() => setSaved(false), 2000); };
+  const saveContext = () => { const upd = { ...tipoContexts, [person]: tipoContext }; setTipoContexts(upd); saveData(`tipo-v8-context-${person}`, tipoContext); const nm = buildMemory(blueprints, upd); setMemory(nm); saveData("tipo-v5-memory", nm); setEditContext(false); setSaved(true); setTimeout(() => setSaved(false), 2000); };
   const currentBp = blueprints[person] || {}; const o = OWNERS.find(o => o.id === person);
 
   return (
@@ -1174,4 +1189,3 @@ function App() {
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App />);
-// v8
