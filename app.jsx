@@ -1,34 +1,35 @@
-// TIPO Brain v5
+// TIPO Brain v6
 // Tilanus Poorthuis Gezinsassistent
 // Sven & Eva — iPad keuken app
+// v6: Proactieve AI-assistent — opent automatisch met gepersonaliseerde analyse
 
 const { useState, useEffect, useRef, useCallback } = React;
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const C = {
-  bg:       "#F5F0E8",
-  paper:    "#FDFAF4",
-  dark:     "#1E1A14",
-  brown:    "#3D2B1F",
-  gold:     "#C9A96E",
-  goldLight:"#E8D5A3",
-  red:      "#7A2020",
-  redLight: "#F5ECEC",
-  sand:     "#E8DCC8",
-  sandDark: "#D4C4A8",
-  muted:    "#8A7968",
-  sven:     "#2C5F8A",
-  svenBg:   "#E8F0F8",
-  eva:      "#7A4A7A",
-  evaBg:    "#F5EEF5",
-  green:    "#3A6B4A",
-  greenBg:  "#EAF5EC",
+  bg:        "#F5F0E8",
+  paper:     "#FDFAF4",
+  dark:      "#1E1A14",
+  brown:     "#3D2B1F",
+  gold:      "#C9A96E",
+  goldLight: "#E8D5A3",
+  red:       "#7A2020",
+  redLight:  "#F5ECEC",
+  sand:      "#E8DCC8",
+  sandDark:  "#D4C4A8",
+  muted:     "#8A7968",
+  sven:      "#2C5F8A",
+  svenBg:    "#E8F0F8",
+  eva:       "#7A4A7A",
+  evaBg:     "#F5EEF5",
+  green:     "#3A6B4A",
+  greenBg:   "#EAF5EC",
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const OWNERS = [
-  { id: "sven",  label: "Sven",  color: C.sven, bg: C.svenBg, avatar: "S" },
-  { id: "eva",   label: "Eva",   color: C.eva,  bg: C.evaBg,  avatar: "E" },
+  { id: "sven",  label: "Sven",  color: C.sven,  bg: C.svenBg,  avatar: "S" },
+  { id: "eva",   label: "Eva",   color: C.eva,   bg: C.evaBg,   avatar: "E" },
   { id: "samen", label: "Samen", color: C.green, bg: C.greenBg, avatar: "✦" },
 ];
 
@@ -42,9 +43,9 @@ const CATEGORIES = [
 ];
 
 const LISTS = [
-  { id: "nu",   label: "Nu",        emoji: "🔥", color: C.red,   light: C.redLight },
+  { id: "nu",   label: "Nu",        emoji: "🔥", color: C.red,    light: C.redLight },
   { id: "week", label: "Deze week", emoji: "📅", color: "#8B5E1A", light: "#FDF5E8" },
-  { id: "ooit", label: "Ooit",      emoji: "🌱", color: C.green, light: C.greenBg },
+  { id: "ooit", label: "Ooit",      emoji: "🌱", color: C.green,  light: C.greenBg },
 ];
 
 const ROUTINE_CATS = [
@@ -54,47 +55,47 @@ const ROUTINE_CATS = [
 ];
 
 const DEFAULT_TASKS = [
-  { id: 1, text: "Huisarts bellen voor baby check-up", done: false, list: "nu", cat: "baby", owner: "eva", notes: "Vraag ook naar vaccinaties planning", milestones: [], aiContent: null },
-  { id: 2, text: "Luiers bijbestellen", done: false, list: "nu", cat: "baby", owner: "sven", notes: "", milestones: [], aiContent: null },
-  { id: 3, text: "Kinderopvang vergelijken", done: false, list: "ooit", cat: "baby", owner: "samen", notes: "De Paddestoel, Hummelhoeve, KinderRijk",
+  { id: 1, text: "Huisarts bellen voor baby check-up", done: false, list: "nu", cat: "baby", owner: "eva", notes: "Vraag ook naar vaccinaties planning", deadline: null, milestones: [], aiContent: null },
+  { id: 2, text: "Luiers bijbestellen", done: false, list: "nu", cat: "baby", owner: "sven", notes: "", deadline: null, milestones: [], aiContent: null },
+  { id: 3, text: "Kinderopvang vergelijken", done: false, list: "ooit", cat: "baby", owner: "samen", notes: "De Paddestoel, Hummelhoeve, KinderRijk", deadline: null,
     milestones: [
-      { id: "m1", text: "Lijst met opties maken", done: true, owner: "eva" },
-      { id: "m2", text: "3 locaties bezoeken", done: false, owner: "samen" },
-      { id: "m3", text: "Keuze maken", done: false, owner: "samen" },
+      { id: "m1", text: "Lijst met opties maken", done: true,  owner: "eva" },
+      { id: "m2", text: "3 locaties bezoeken",    done: false, owner: "samen" },
+      { id: "m3", text: "Keuze maken",            done: false, owner: "samen" },
     ], aiContent: null },
-  { id: 4, text: "Hypotheek adviesgesprek plannen", done: false, list: "ooit", cat: "nieuw_huis", owner: "sven", notes: "Adviseur: Jan de Vries 06-12345678",
+  { id: 4, text: "Hypotheek adviesgesprek plannen", done: false, list: "ooit", cat: "nieuw_huis", owner: "sven", notes: "Adviseur: Jan de Vries 06-12345678", deadline: null,
     milestones: [
-      { id: "m4", text: "Adviseur contacteren", done: true, owner: "sven" },
-      { id: "m5", text: "Documenten verzamelen", done: true, owner: "samen" },
-      { id: "m6", text: "Gesprek inplannen", done: false, owner: "sven" },
+      { id: "m4", text: "Adviseur contacteren",  done: true,  owner: "sven" },
+      { id: "m5", text: "Documenten verzamelen", done: true,  owner: "samen" },
+      { id: "m6", text: "Gesprek inplannen",     done: false, owner: "sven" },
     ], aiContent: null },
-  { id: 5, text: "Zomervakantie bestemming kiezen", done: false, list: "ooit", cat: "vakantie", owner: "samen", notes: "Ideeën: Zuid-Frankrijk, Italië, Kroatië", milestones: [], aiContent: null },
+  { id: 5, text: "Zomervakantie bestemming kiezen", done: false, list: "ooit", cat: "vakantie", owner: "samen", notes: "Ideeën: Zuid-Frankrijk, Italië, Kroatië", deadline: null, milestones: [], aiContent: null },
 ];
 
 const DEFAULT_ROUTINES = {
   weekly: [
-    { id: "w1", text: "Zone 2 cardio (45 min)", owner: "sven", emoji: "🫀", cat: "leefstijl", streak: 4 },
-    { id: "w2", text: "Zone 2 cardio (45 min)", owner: "eva",  emoji: "🫀", cat: "leefstijl", streak: 2 },
-    { id: "w3", text: "Krachttraining (2x per week)", owner: "sven", emoji: "💪", cat: "leefstijl", streak: 6 },
-    { id: "w4", text: "Krachttraining (1x per week)", owner: "eva",  emoji: "💪", cat: "leefstijl", streak: 1 },
-    { id: "w5", text: "Slaap check (gem. 7-9u)", owner: "sven", emoji: "😴", cat: "leefstijl", streak: 3 },
-    { id: "w6", text: "Boodschappen doen", owner: "sven", emoji: "🛒", cat: "huishouden", streak: 8 },
-    { id: "w7", text: "Huis schoonmaken", owner: "eva",  emoji: "🏠", cat: "huishouden", streak: 5 },
-    { id: "w8", text: "Week planning samen", owner: "samen", emoji: "📋", cat: "huishouden", streak: 2 },
+    { id: "w1", text: "Zone 2 cardio (45 min)",       owner: "sven", emoji: "🫀", cat: "leefstijl",  streak: 4, completions: {} },
+    { id: "w2", text: "Zone 2 cardio (45 min)",       owner: "eva",  emoji: "🫀", cat: "leefstijl",  streak: 2, completions: {} },
+    { id: "w3", text: "Krachttraining (2x per week)", owner: "sven", emoji: "💪", cat: "leefstijl",  streak: 6, completions: {} },
+    { id: "w4", text: "Krachttraining (1x per week)", owner: "eva",  emoji: "💪", cat: "leefstijl",  streak: 1, completions: {} },
+    { id: "w5", text: "Slaap check (gem. 7-9u)",      owner: "sven", emoji: "😴", cat: "leefstijl",  streak: 3, completions: {} },
+    { id: "w6", text: "Boodschappen doen",            owner: "sven", emoji: "🛒", cat: "huishouden", streak: 8, completions: {} },
+    { id: "w7", text: "Huis schoonmaken",             owner: "eva",  emoji: "🏠", cat: "huishouden", streak: 5, completions: {} },
+    { id: "w8", text: "Week planning samen",          owner: "samen",emoji: "📋", cat: "huishouden", streak: 2, completions: {} },
   ],
   monthly: [
-    { id: "m1", text: "Bloedwaarden checken", owner: "sven", emoji: "🩸", cat: "leefstijl", streak: 3 },
-    { id: "m2", text: "Financiën doornemen", owner: "sven", emoji: "💶", cat: "huishouden", streak: 5 },
-    { id: "m3", text: "Supplementen bestellen", owner: "eva",  emoji: "💊", cat: "leefstijl", streak: 4 },
-    { id: "m4", text: "Prenatale check-up", owner: "eva",  emoji: "👶", cat: "baby", streak: 2 },
+    { id: "m1", text: "Bloedwaarden checken",   owner: "sven", emoji: "🩸", cat: "leefstijl",  streak: 3, completions: {} },
+    { id: "m2", text: "Financiën doornemen",    owner: "sven", emoji: "💶", cat: "huishouden", streak: 5, completions: {} },
+    { id: "m3", text: "Supplementen bestellen", owner: "eva",  emoji: "💊", cat: "leefstijl",  streak: 4, completions: {} },
+    { id: "m4", text: "Prenatale check-up",     owner: "eva",  emoji: "👶", cat: "baby",       streak: 2, completions: {} },
   ],
 };
 
 const RECAP_QUESTIONS = [
-  { id: "energy",    label: "Hoe was je energieniveau deze week?", type: "scale",  icon: "⚡" },
-  { id: "highlight", label: "Wat ging goed of waar ben je trots op?", type: "text", icon: "✨", placeholder: "Bijv. Zone 2 elke dag gehaald, goed gesprek gehad..." },
-  { id: "struggle",  label: "Waar liep je tegenaan?", type: "text", icon: "🌊", placeholder: "Bijv. weinig slaap, druk op werk..." },
-  { id: "focus",     label: "Wat wil je volgende week beter doen?", type: "text", icon: "🎯", placeholder: "Bijv. eerder naar bed, meer bewegen..." },
+  { id: "energy",    label: "Hoe was je energieniveau deze week?", type: "scale", icon: "⚡" },
+  { id: "highlight", label: "Wat ging goed of waar ben je trots op?", type: "text", icon: "✨", placeholder: "Bijv. Zone 2 elke dag gehaald, goed gesprek gehad…" },
+  { id: "struggle",  label: "Waar liep je tegenaan?",              type: "text", icon: "🌊", placeholder: "Bijv. weinig slaap, druk op werk…" },
+  { id: "focus",     label: "Wat wil je volgende week beter doen?", type: "text", icon: "🎯", placeholder: "Bijv. eerder naar bed, meer bewegen…" },
 ];
 
 let nextId  = 20;
@@ -124,11 +125,10 @@ const getMonthKey = () => {
 
 // ─── Storage ──────────────────────────────────────────────────────────────────
 const KEYS = {
-  tasks:    "tipo-v5-tasks",
-  routines: "tipo-v5-routines",
-  completions: "tipo-v5-completions",
-  recaps:   "tipo-v5-recaps",
-  memory:   "tipo-v5-memory",
+  tasks:         "tipo-v5-tasks",
+  routines:      "tipo-v5-routines",
+  recaps:        "tipo-v5-recaps",
+  memory:        "tipo-v5-memory",
   blueprintSven: "tipo-v5-blueprint-sven",
   blueprintEva:  "tipo-v5-blueprint-eva",
 };
@@ -179,18 +179,18 @@ Owners: sven, eva, samen | Lijsten: nu, week, ooit | Categorieën: huis, baby, f
 Als de gebruiker acties wil, voeg een <actions> blok toe aan het EINDE:
 <actions>
 [
-  { "type": "add", "text": "...", "list": "nu|week|ooit", "cat": "...", "owner": "sven|eva|samen", "notes": "" },
-  { "type": "done", "id": 123 },
-  { "type": "undone", "id": 123 },
-  { "type": "delete", "id": 123 },
-  { "type": "move", "id": 123, "list": "ooit" },
-  { "type": "set_owner", "id": 123, "owner": "eva" },
-  { "type": "update_notes", "id": 123, "notes": "..." },
-  { "type": "add_milestones", "id": 123, "milestones": [{"text": "stap 1", "owner": "sven"}, {"text": "stap 2", "owner": "eva"}] }
+  { "type": "add", "text": "…", "list": "nu|week|ooit", "cat": "…", "owner": "sven|eva|samen", "notes": "" },
+  { "type": "done",         "id": 123 },
+  { "type": "undone",       "id": 123 },
+  { "type": "delete",       "id": 123 },
+  { "type": "move",         "id": 123, "list": "ooit" },
+  { "type": "set_owner",    "id": 123, "owner": "eva" },
+  { "type": "update_notes", "id": 123, "notes": "…" },
+  { "type": "add_milestones", "id": 123, "milestones": [{"text": "stap 1", "owner": "sven"}] }
 ]
 </actions>
 
-Gebruik add_milestones als de gebruiker vraagt om stappen, mijlpalen of een stappenplan bij een bestaande taak. De id is het taaknummer uit de takenlijst hierboven. Bij een nieuwe taak: maak eerst de taak aan met "add", geef die taak een logische id (gebruik het volgende vrije nummer), en voeg dan direct add_milestones toe met datzelfde id. Reageer altijd in het Nederlands. Wees warm, concreet en beknopt. Je kent Peter Attia's principes (Zone 2, kracht, slaap, voeding) en GTD/Tiny Habits methodieken.`;
+Reageer altijd in het Nederlands. Wees warm, concreet en beknopt. Je kent Peter Attia's principes (Zone 2, kracht, slaap, voeding) en GTD/Tiny Habits methodieken.`;
 
   const text = await callClaude(messages, system);
   const match = text.match(/<actions>([\s\S]*?)<\/actions>/);
@@ -213,7 +213,7 @@ Geef een JSON response met EXACT deze structuur (geen markdown, geen extra tekst
   ]
 }
 
-Geef 3-6 concrete, afvinkbare milestones. Wijs eigenaren toe op basis van wie er logisch verantwoordelijk voor is (sven/eva/samen). Schrijf in het Nederlands.`;
+Geef 3-6 concrete, afvinkbare milestones. Wijs eigenaren toe op basis van logische verantwoordelijkheid. Schrijf in het Nederlands.`;
 
   const raw = await callClaude(
     [{ role: "user", content: `Bereid voor: "${task.text}"\n\nContext: ${task.notes || "geen"}` }],
@@ -223,7 +223,6 @@ Geef 3-6 concrete, afvinkbare milestones. Wijs eigenaren toe op basis van wie er
     const clean = raw.replace(/```json|```/g, "").trim();
     return JSON.parse(clean);
   } catch (_) {
-    // Fallback: return as text content
     return { samenvatting: raw, aandachtspunten: [], bronnen: [], milestones: [] };
   }
 }
@@ -233,6 +232,71 @@ async function generateRecapInsight(svenAnswers, evaAnswers, tasks) {
   return callClaude(
     [{ role: "user", content: `Sven's week:\n- Energie: ${svenAnswers.energy}/5\n- Goed: ${svenAnswers.highlight}\n- Moeilijk: ${svenAnswers.struggle}\n- Focus: ${svenAnswers.focus}\n\nEva's week:\n- Energie: ${evaAnswers.energy}/5\n- Goed: ${evaAnswers.highlight}\n- Moeilijk: ${evaAnswers.struggle}\n- Focus: ${evaAnswers.focus}\n\nOpen taken: ${tasks.filter(t => !t.done).length}` }],
     system, 400
+  );
+}
+
+// ─── NIEUW v6: Proactieve begroeting ─────────────────────────────────────────
+async function generateProactiveGreeting(tasks, memory, recaps) {
+  const now = new Date();
+  const hour = now.getHours();
+  const dayGreeting = hour < 12 ? "Goedemorgen" : hour < 18 ? "Goedemiddag" : "Goedenavond";
+  const today = now.toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long" });
+
+  // Overschreden deadlines
+  const overdue = tasks.filter(t => !t.done && t.deadline && new Date(t.deadline) < now);
+
+  // Deadlines binnen 3 dagen
+  const dueSoon = tasks.filter(t => {
+    if (t.done || !t.deadline) return false;
+    const days = Math.ceil((new Date(t.deadline) - now) / 86400000);
+    return days >= 0 && days <= 3;
+  });
+
+  // Taakverdeling
+  const svenOpen = tasks.filter(t => !t.done && t.owner === "sven").length;
+  const evaOpen  = tasks.filter(t => !t.done && t.owner === "eva").length;
+  const samenOpen = tasks.filter(t => !t.done && t.owner === "samen").length;
+
+  // "Nu"-taken zonder deadline
+  const urgentNoDL = tasks.filter(t => !t.done && t.list === "nu" && !t.deadline);
+
+  // Laatste recap
+  const lastRecap = recaps?.[0];
+
+  const contextLines = [
+    `${dayGreeting}, vandaag is het ${today}.`,
+    `Open taken: ${tasks.filter(t => !t.done).length} totaal — Sven: ${svenOpen}, Eva: ${evaOpen}, Samen: ${samenOpen}.`,
+    overdue.length
+      ? `OVERSCHREDEN deadlines (${overdue.length}): ${overdue.map(t => `"${t.text}"`).join(", ")}.`
+      : null,
+    dueSoon.length
+      ? `Deadlines binnen 3 dagen: ${dueSoon.map(t => {
+          const days = Math.ceil((new Date(t.deadline) - now) / 86400000);
+          return `"${t.text}" (${days === 0 ? "vandaag" : days === 1 ? "morgen" : `${days} dagen`})`;
+        }).join(", ")}.`
+      : null,
+    urgentNoDL.length
+      ? `"Nu"-taken zonder deadline (${urgentNoDL.length}): ${urgentNoDL.slice(0, 3).map(t => `"${t.text}"`).join(", ")}.`
+      : null,
+    lastRecap
+      ? `Laatste recap (${lastRecap.week}): Sven energie ${lastRecap.sven?.energy}/5, Eva energie ${lastRecap.eva?.energy}/5. TIPO inzicht destijds: "${lastRecap.insight}".`
+      : "Nog geen wekelijkse recap ingevuld.",
+    memory ? `Persoonlijke context:\n${memory.slice(0, 500)}` : null,
+  ].filter(Boolean).join("\n");
+
+  const system = `Je bent TIPO, de persoonlijke AI-assistent van Sven en Eva Tilanus-Poorthuis. Je opent nu proactief het gesprek — zij hebben de chat zojuist geopend.
+
+Schrijf een beknopt, warm en direct openingsbericht van maximaal 3-4 zinnen. Regels:
+- Geen generieke "hoe kan ik helpen" — wees specifiek over wat je ziet
+- Noem het meest urgente of opvallende bij naam (deadline, taak, patroon)
+- Sluit af met één concrete vraag of suggestie
+- Schrijf in het Nederlands, geen bullet points, gewone zinnen
+- Als er niets urgents is: geef een positieve observatie en stel een proactieve vraag`;
+
+  return callClaude(
+    [{ role: "user", content: `Situatie:\n${contextLines}` }],
+    system,
+    350
   );
 }
 
@@ -287,11 +351,11 @@ function ProgressBar({ milestones, color }) {
 }
 
 function MilestoneEditor({ milestones, onChange, color }) {
-  const [newText, setNewText] = useState("");
+  const [newText, setNewText]   = useState("");
   const [newOwner, setNewOwner] = useState("samen");
 
-  const toggle = (id) => onChange(milestones.map(m => m.id === id ? { ...m, done: !m.done } : m));
-  const remove = (id) => onChange(milestones.filter(m => m.id !== id));
+  const toggle     = (id) => onChange(milestones.map(m => m.id === id ? { ...m, done: !m.done } : m));
+  const remove     = (id) => onChange(milestones.filter(m => m.id !== id));
   const cycleOwner = (id) => onChange(milestones.map(m => {
     if (m.id !== id) return m;
     const idx = OWNERS.findIndex(o => o.id === (m.owner || "samen"));
@@ -322,7 +386,7 @@ function MilestoneEditor({ milestones, onChange, color }) {
       <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
         <div style={{ display: "flex", gap: 6 }}>
           <input value={newText} onChange={e => setNewText(e.target.value)} onKeyDown={e => e.key === "Enter" && add()}
-            placeholder="Nieuwe mijlpaal..."
+            placeholder="Nieuwe mijlpaal…"
             style={{ flex: 1, padding: "8px 12px", borderRadius: 10, border: `1px solid ${C.sand}`, fontSize: 13, fontFamily: "'Georgia', serif", background: C.paper, outline: "none", color: C.dark }}
           />
           <button onClick={add} style={{ padding: "8px 14px", borderRadius: 10, border: "none", background: color, color: "white", fontSize: 16, cursor: "pointer" }}>+</button>
@@ -341,14 +405,10 @@ function AIContent({ content, loading, color, onAddMilestones }) {
   );
   if (!content) return null;
 
-  // Structured JSON format
   if (typeof content === "object" && content.samenvatting) {
     return (
       <div style={{ fontSize: 13, lineHeight: 1.7 }}>
-        {/* Samenvatting */}
         <div style={{ color: "#E8E4DC", marginBottom: 12 }}>{content.samenvatting}</div>
-
-        {/* Aandachtspunten */}
         {content.aandachtspunten?.length > 0 && (
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 9, letterSpacing: 2, color: color, textTransform: "uppercase", marginBottom: 6 }}>Aandachtspunten</div>
@@ -357,8 +417,6 @@ function AIContent({ content, loading, color, onAddMilestones }) {
             ))}
           </div>
         )}
-
-        {/* Bronnen */}
         {content.bronnen?.length > 0 && (
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 9, letterSpacing: 2, color: color, textTransform: "uppercase", marginBottom: 6 }}>Bronnen & Tips</div>
@@ -367,8 +425,6 @@ function AIContent({ content, loading, color, onAddMilestones }) {
             ))}
           </div>
         )}
-
-        {/* Voorgestelde milestones */}
         {content.milestones?.length > 0 && (
           <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: 12, padding: "12px 14px", marginTop: 4 }}>
             <div style={{ fontSize: 9, letterSpacing: 2, color: color, textTransform: "uppercase", marginBottom: 10 }}>🎯 Voorgestelde mijlpalen</div>
@@ -393,7 +449,6 @@ function AIContent({ content, loading, color, onAddMilestones }) {
     );
   }
 
-  // Fallback: plain text
   return (
     <div style={{ fontSize: 13, color: "#E8E4DC", lineHeight: 1.75 }}>
       {String(content).split("\n").map((line, i) => {
@@ -407,28 +462,27 @@ function AIContent({ content, loading, color, onAddMilestones }) {
 }
 
 // ─── TAKEN TAB ────────────────────────────────────────────────────────────────
-function TasksTab({ tasks, setTasks, memory, filterOwner }) {
-  const [tab, setTab]             = useState("nu");
-  const [filterCat, setFilterCat] = useState(null);
-  const [adding, setAdding]       = useState(false);
-  const [newText, setNewText]     = useState("");
-  const [newNotes, setNewNotes]   = useState("");
-  const [newCat, setNewCat]       = useState("huis");
-  const [newList, setNewList]     = useState("nu");
-  const [newOwner, setNewOwner]   = useState("samen");
+function TasksTab({ tasks, setTasks, memory, recaps, filterOwner }) {
+  const [tab, setTab]               = useState("nu");
+  const [filterCat, setFilterCat]   = useState(null);
+  const [adding, setAdding]         = useState(false);
+  const [newText, setNewText]       = useState("");
+  const [newNotes, setNewNotes]     = useState("");
+  const [newCat, setNewCat]         = useState("huis");
+  const [newList, setNewList]       = useState("nu");
+  const [newOwner, setNewOwner]     = useState("samen");
   const [newDeadline, setNewDeadline] = useState("");
-  const [detailId, setDetailId]   = useState(null);
+  const [detailId, setDetailId]     = useState(null);
   const [draftNotes, setDraftNotes] = useState("");
-  const [editNotes, setEditNotes] = useState(false);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [chatOpen, setChatOpen]   = useState(false);
-  const [chatMsgs, setChatMsgs]   = useState([
-    { role: "assistant", content: "Hoi Sven en Eva! 👋 Ik ben TIPO. Ik kan taken beheren, voorbereiden en ideeën aandragen. Wat kan ik voor jullie doen?" }
-  ]);
-  const [chatInput, setChatInput] = useState("");
+  const [editNotes, setEditNotes]   = useState(false);
+  const [aiLoading, setAiLoading]   = useState(false);
+  const [chatOpen, setChatOpen]     = useState(false);
+  const [chatMsgs, setChatMsgs]     = useState([]);           // v6: leeg — proactief gevuld
+  const [greetingDone, setGreetingDone] = useState(false);   // v6: voorkom dubbele greeting
+  const [chatInput, setChatInput]   = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [apiError, setApiError]   = useState(null);
+  const [apiError, setApiError]     = useState(null);
   const chatEndRef = useRef(null);
   const recognitionRef = useRef(null);
 
@@ -447,16 +501,16 @@ function TasksTab({ tasks, setTasks, memory, filterOwner }) {
 
   const countFor = (lid) => tasks.filter(t => t.list === lid && !t.done).length;
 
-  const toggleTask = (id) => setTasks(prev => prev.map(t => t.id === id ? { ...t, done: !t.done } : t));
-  const removeTask = (id) => { setTasks(prev => prev.filter(t => t.id !== id)); if (detailId === id) setDetailId(null); };
-  const cycleOwner = (id) => setTasks(prev => prev.map(t => {
+  const toggleTask     = (id) => setTasks(prev => prev.map(t => t.id === id ? { ...t, done: !t.done } : t));
+  const removeTask     = (id) => { setTasks(prev => prev.filter(t => t.id !== id)); if (detailId === id) setDetailId(null); };
+  const cycleOwner     = (id) => setTasks(prev => prev.map(t => {
     if (t.id !== id) return t;
     const idx = OWNERS.findIndex(o => o.id === (t.owner || "samen"));
     return { ...t, owner: OWNERS[(idx + 1) % OWNERS.length].id };
   }));
   const updateMilestones = (id, ms) => setTasks(prev => prev.map(t => t.id === id ? { ...t, milestones: ms } : t));
-  const saveNotes = () => { setTasks(prev => prev.map(t => t.id === detailId ? { ...t, notes: draftNotes } : t)); setEditNotes(false); };
-  const openDetail = (task) => { setDetailId(task.id); setDraftNotes(task.notes || ""); setEditNotes(false); };
+  const saveNotes        = () => { setTasks(prev => prev.map(t => t.id === detailId ? { ...t, notes: draftNotes } : t)); setEditNotes(false); };
+  const openDetail       = (task) => { setDetailId(task.id); setDraftNotes(task.notes || ""); setEditNotes(false); };
 
   const addTask = () => {
     if (!newText.trim()) return;
@@ -467,7 +521,7 @@ function TasksTab({ tasks, setTasks, memory, filterOwner }) {
   const applyActions = (actions, prev) => {
     let updated = [...prev];
     for (const a of actions) {
-      if (a.type === "add")          updated.push({ id: nextId++, text: a.text, done: false, list: a.list || "nu", cat: a.cat || "overig", owner: a.owner || "samen", notes: a.notes || "", milestones: [], aiContent: null });
+      if (a.type === "add")          updated.push({ id: nextId++, text: a.text, done: false, list: a.list || "nu", cat: a.cat || "overig", owner: a.owner || "samen", notes: a.notes || "", deadline: a.deadline || null, milestones: [], aiContent: null });
       else if (a.type === "done")         updated = updated.map(t => t.id === a.id ? { ...t, done: true }  : t);
       else if (a.type === "undone")       updated = updated.map(t => t.id === a.id ? { ...t, done: false } : t);
       else if (a.type === "delete")       updated = updated.filter(t => t.id !== a.id);
@@ -475,17 +529,9 @@ function TasksTab({ tasks, setTasks, memory, filterOwner }) {
       else if (a.type === "set_owner")    updated = updated.map(t => t.id === a.id ? { ...t, owner: a.owner } : t);
       else if (a.type === "update_notes") updated = updated.map(t => t.id === a.id ? { ...t, notes: a.notes } : t);
       else if (a.type === "add_milestones") {
-        const newMs = (a.milestones || []).map(m => ({
-          id: `m${nextMid++}`, text: m.text, done: false, owner: m.owner || "samen"
-        }));
-        // Zoek op id — als de taak net aangemaakt is, pak dan de laatste toegevoegde
+        const newMs = (a.milestones || []).map(m => ({ id: `m${nextMid++}`, text: m.text, done: false, owner: m.owner || "samen" }));
         const target = updated.find(t => t.id === a.id) || updated[updated.length - 1];
-        if (target) {
-          updated = updated.map(t => t.id === target.id
-            ? { ...t, milestones: [...(t.milestones || []), ...newMs] }
-            : t
-          );
-        }
+        if (target) updated = updated.map(t => t.id === target.id ? { ...t, milestones: [...(t.milestones || []), ...newMs] } : t);
       }
     }
     return updated;
@@ -510,6 +556,22 @@ function TasksTab({ tasks, setTasks, memory, filterOwner }) {
     setChatLoading(false);
   };
 
+  // v6: Open chat met proactieve begroeting
+  const openChat = async () => {
+    setChatOpen(true);
+    if (!greetingDone) {
+      setGreetingDone(true);
+      setChatLoading(true);
+      try {
+        const greeting = await generateProactiveGreeting(tasks, memory, recaps);
+        setChatMsgs([{ role: "assistant", content: greeting }]);
+      } catch {
+        setChatMsgs([{ role: "assistant", content: "Hoi! 👋 Ik ben TIPO — wat kan ik voor jullie doen?" }]);
+      }
+      setChatLoading(false);
+    }
+  };
+
   const handlePrepare = async (task) => {
     setAiLoading(true);
     setApiError(null);
@@ -520,7 +582,6 @@ function TasksTab({ tasks, setTasks, memory, filterOwner }) {
     setAiLoading(false);
   };
 
-  // Spraak (Kippie)
   const startListening = () => {
     if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
       setApiError("Spraak niet ondersteund in deze browser");
@@ -531,13 +592,9 @@ function TasksTab({ tasks, setTasks, memory, filterOwner }) {
     recognition.lang = "nl-NL";
     recognition.continuous = false;
     recognition.interimResults = false;
-    recognition.onresult = (e) => {
-      const transcript = e.results[0][0].transcript;
-      setChatInput(transcript);
-      setIsListening(false);
-    };
-    recognition.onerror = () => setIsListening(false);
-    recognition.onend = () => setIsListening(false);
+    recognition.onresult  = (e) => { setChatInput(e.results[0][0].transcript); setIsListening(false); };
+    recognition.onerror   = () => setIsListening(false);
+    recognition.onend     = () => setIsListening(false);
     recognitionRef.current = recognition;
     recognition.start();
     setIsListening(true);
@@ -547,7 +604,6 @@ function TasksTab({ tasks, setTasks, memory, filterOwner }) {
     const cat = getCat(task.cat);
     const pct = progress(task.milestones);
 
-    // Deadline kleur
     const deadlineColor = (() => {
       if (!task.deadline || faded) return null;
       const days = Math.ceil((new Date(task.deadline) - new Date()) / 86400000);
@@ -559,7 +615,7 @@ function TasksTab({ tasks, setTasks, memory, filterOwner }) {
     const deadlineLabel = (() => {
       if (!task.deadline || faded) return null;
       const days = Math.ceil((new Date(task.deadline) - new Date()) / 86400000);
-      if (days < 0)  return `${Math.abs(days)}d te laat`;
+      if (days < 0)   return `${Math.abs(days)}d te laat`;
       if (days === 0) return "Vandaag!";
       if (days === 1) return "Morgen";
       return `${days}d`;
@@ -575,7 +631,6 @@ function TasksTab({ tasks, setTasks, memory, filterOwner }) {
             cursor: "pointer", color: "white", fontSize: 12,
             display: "flex", alignItems: "center", justifyContent: "center",
           }}>{faded ? "✓" : ""}</button>
-
           <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => openDetail(task)}>
             <div style={{ fontSize: 15, color: faded ? C.muted : C.dark, lineHeight: 1.45, textDecoration: faded ? "line-through" : "none", fontFamily: "'Georgia', serif" }}>
               {task.text}
@@ -593,7 +648,6 @@ function TasksTab({ tasks, setTasks, memory, filterOwner }) {
             </div>
             {pct !== null && !faded && <ProgressBar milestones={task.milestones} color={currentList.color} />}
           </div>
-
           <Avatar ownerId={task.owner} size={24} onClick={() => cycleOwner(task.id)} />
           <button onClick={() => removeTask(task.id)} style={{ background: "none", border: "none", color: C.sandDark, cursor: "pointer", fontSize: 20, padding: "0 2px", flexShrink: 0, lineHeight: 1 }}>×</button>
         </div>
@@ -603,7 +657,6 @@ function TasksTab({ tasks, setTasks, memory, filterOwner }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
-      {/* Error banner */}
       {apiError && (
         <div style={{ background: C.redLight, borderBottom: `1px solid ${C.red}33`, padding: "8px 20px", fontSize: 12, color: C.red, display: "flex", justifyContent: "space-between" }}>
           <span>⚠️ {apiError}</span>
@@ -614,7 +667,7 @@ function TasksTab({ tasks, setTasks, memory, filterOwner }) {
       {/* List tabs */}
       <div style={{ display: "flex", background: C.dark, padding: "0 20px", gap: 4, flexShrink: 0 }}>
         {LISTS.map(list => {
-          const count = countFor(list.id);
+          const count  = countFor(list.id);
           const active = tab === list.id;
           return (
             <button key={list.id} onClick={() => { setTab(list.id); setFilterCat(null); }} style={{
@@ -635,19 +688,18 @@ function TasksTab({ tasks, setTasks, memory, filterOwner }) {
       {/* Cat filters */}
       <div style={{ display: "flex", gap: 5, padding: "10px 16px", overflowX: "auto", background: C.sand, borderBottom: `1px solid ${C.sandDark}`, scrollbarWidth: "none", flexShrink: 0 }}>
         {[{ id: null, label: "Alles", emoji: "" }, ...CATEGORIES].map(cat => {
-          const isAll = cat.id === null;
-          const count = isAll ? null : tasks.filter(t => t.list === tab && t.cat === cat.id && !t.done).length;
+          const isAll  = cat.id === null;
+          const count  = isAll ? null : tasks.filter(t => t.list === tab && t.cat === cat.id && !t.done).length;
           if (!isAll && count === 0 && filterCat !== cat.id) return null;
           const active = isAll ? !filterCat : filterCat === cat.id;
           return (
             <button key={cat.id ?? "all"} onClick={() => setFilterCat(isAll ? null : filterCat === cat.id ? null : cat.id)} style={{
               padding: "5px 11px", borderRadius: 14, border: "none",
               background: active ? C.dark : C.paper, color: active ? C.gold : C.brown,
-              fontSize: 11, cursor: "pointer", fontFamily: "'Georgia', serif",
-              whiteSpace: "nowrap", flexShrink: 0,
+              fontSize: 11, cursor: "pointer", fontFamily: "'Georgia', serif", whiteSpace: "nowrap", flexShrink: 0,
             }}>
               {cat.emoji && <span style={{ marginRight: 3 }}>{cat.emoji}</span>}{cat.label}
-              {count > 0 && <span style={{ marginLeft: 4, color: active ? C.gold + "88" : C.sandDark }}>({count})</span>}
+              {count > 0 && <span style={{ marginLeft: 4, color: active ? `${C.gold}88` : C.sandDark }}>({count})</span>}
             </button>
           );
         })}
@@ -747,7 +799,6 @@ function TasksTab({ tasks, setTasks, memory, filterOwner }) {
               boxShadow: "0 -12px 48px rgba(0,0,0,0.25)", maxHeight: "88vh", overflowY: "auto",
             }}>
               <div style={{ width: 40, height: 4, borderRadius: 2, background: C.sand, margin: "0 auto 18px" }} />
-
               <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 16 }}>
                 <button onClick={() => { toggleTask(detailItem.id); setDetailId(null); }} style={{
                   width: 26, height: 26, borderRadius: "50%", flexShrink: 0, marginTop: 2,
@@ -816,20 +867,17 @@ function TasksTab({ tasks, setTasks, memory, filterOwner }) {
                     fontSize: 11, cursor: aiLoading ? "default" : "pointer", fontFamily: "'Georgia', serif", fontWeight: 700,
                   }}>{aiLoading ? "Laden..." : detailItem.aiContent ? "Ververs" : "Bereid voor"}</button>
                 </div>
-                {(detailItem.aiContent || aiLoading) && <AIContent
-                  content={detailItem.aiContent}
-                  loading={aiLoading}
-                  color={C.gold}
-                  onAddMilestones={(suggestions) => {
-                    const newMs = suggestions.map(m => ({
-                      id: `m${nextMid++}`, text: m.text, done: false, owner: m.owner || "samen"
-                    }));
-                    setTasks(prev => prev.map(t => t.id === detailItem.id
-                      ? { ...t, milestones: [...(t.milestones || []), ...newMs] }
-                      : t
-                    ));
-                  }}
-                />
+                {(detailItem.aiContent || aiLoading) && (
+                  <AIContent
+                    content={detailItem.aiContent}
+                    loading={aiLoading}
+                    color={C.gold}
+                    onAddMilestones={(suggestions) => {
+                      const newMs = suggestions.map(m => ({ id: `m${nextMid++}`, text: m.text, done: false, owner: m.owner || "samen" }));
+                      setTasks(prev => prev.map(t => t.id === detailItem.id ? { ...t, milestones: [...(t.milestones || []), ...newMs] } : t));
+                    }}
+                  />
+                )}
                 {!detailItem.aiContent && !aiLoading && <div style={{ fontSize: 12, color: "#555", fontFamily: "'Georgia', serif" }}>Laat TIPO ideeën, bronnen en stappen genereren.</div>}
               </div>
 
@@ -865,7 +913,7 @@ function TasksTab({ tasks, setTasks, memory, filterOwner }) {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
                   <div style={{ color: C.gold, fontSize: 11, letterSpacing: 2, textTransform: "uppercase" }}>✦ TIPO</div>
-                  <div style={{ color: "#555", fontSize: 11, marginTop: 2 }}>Beheer taken · vraag advies · wijs toe</div>
+                  <div style={{ color: "#555", fontSize: 11, marginTop: 2 }}>Proactieve gezinsassistent</div>
                 </div>
                 <button onClick={() => setChatOpen(false)} style={{ background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: 24 }}>×</button>
               </div>
@@ -892,7 +940,6 @@ function TasksTab({ tasks, setTasks, memory, filterOwner }) {
             </div>
 
             <div style={{ padding: "10px 16px 30px", borderTop: "1px solid #252218", flexShrink: 0, display: "flex", gap: 8, alignItems: "center" }}>
-              {/* Kippie spraakknop */}
               <button onClick={startListening} style={{
                 width: 44, height: 44, borderRadius: "50%", border: "none", flexShrink: 0,
                 background: isListening ? C.red : "#2A2520",
@@ -900,7 +947,6 @@ function TasksTab({ tasks, setTasks, memory, filterOwner }) {
                 display: "flex", alignItems: "center", justifyContent: "center",
                 animation: isListening ? "tipoFade 1s infinite" : "none",
               }} title="Kippie — spreek je bericht in">🎙️</button>
-
               <input value={chatInput} onChange={e => setChatInput(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && sendChat()}
                 placeholder={isListening ? "Luisteren..." : "Vraag TIPO iets..."}
@@ -917,9 +963,9 @@ function TasksTab({ tasks, setTasks, memory, filterOwner }) {
         </>
       )}
 
-      {/* Chat button (floating) */}
+      {/* Floating chat button — v6: triggert proactieve greeting */}
       {!chatOpen && (
-        <button onClick={() => setChatOpen(true)} style={{
+        <button onClick={openChat} style={{
           position: "fixed", bottom: 90, right: 20,
           width: 52, height: 52, borderRadius: "50%",
           background: C.dark, border: `2px solid ${C.gold}`,
@@ -934,13 +980,13 @@ function TasksTab({ tasks, setTasks, memory, filterOwner }) {
 
 // ─── ROUTINES TAB ─────────────────────────────────────────────────────────────
 function RoutinesTab({ routines, setRoutines, filterOwner }) {
-  const [period, setPeriod]   = useState("weekly");
-  const [filter, setFilter]   = useState(null);
-  const [adding, setAdding]   = useState(false);
-  const [newText, setNewText] = useState("");
+  const [period, setPeriod]     = useState("weekly");
+  const [filter, setFilter]     = useState(null);
+  const [adding, setAdding]     = useState(false);
+  const [newText, setNewText]   = useState("");
   const [newEmoji, setNewEmoji] = useState("✅");
   const [newOwner, setNewOwner] = useState("sven");
-  const [newCat, setNewCat]   = useState("leefstijl");
+  const [newCat, setNewCat]     = useState("leefstijl");
 
   const weekKey  = getWeekKey();
   const monthKey = getMonthKey();
@@ -952,7 +998,7 @@ function RoutinesTab({ routines, setRoutines, filterOwner }) {
       [period]: prev[period].map(r => {
         if (r.id !== id) return r;
         const comps = r.completions || {};
-        const done = !comps[key];
+        const done  = !comps[key];
         return { ...r, completions: { ...comps, [key]: done || undefined }, streak: done ? (r.streak || 0) + 1 : Math.max(0, (r.streak || 0) - 1) };
       }),
     }));
@@ -964,7 +1010,7 @@ function RoutinesTab({ routines, setRoutines, filterOwner }) {
       [period]: prev[period].map(r => {
         if (r.id !== id) return r;
         const owners = OWNERS.filter(o => o.id !== "samen");
-        const idx = owners.findIndex(o => o.id === r.owner);
+        const idx    = owners.findIndex(o => o.id === r.owner);
         return { ...r, owner: owners[(idx + 1) % owners.length].id };
       }),
     }));
@@ -981,10 +1027,9 @@ function RoutinesTab({ routines, setRoutines, filterOwner }) {
   };
 
   const activeFilter = filterOwner || filter;
-  const visible = routines[period].filter(r => !activeFilter || r.owner === activeFilter);
-  const cats = ["leefstijl", "huishouden", "baby"].filter(c => visible.some(r => r.cat === c));
+  const visible      = routines[period].filter(r => !activeFilter || r.owner === activeFilter);
+  const cats         = ["leefstijl", "huishouden", "baby"].filter(c => visible.some(r => r.cat === c));
 
-  // Score
   const stats = OWNERS.filter(o => o.id !== "samen").map(o => {
     const mine = routines[period].filter(r => r.owner === o.id);
     const done = mine.filter(r => (r.completions || {})[key]).length;
@@ -997,7 +1042,6 @@ function RoutinesTab({ routines, setRoutines, filterOwner }) {
 
   return (
     <div style={{ flex: 1, overflowY: "auto" }}>
-      {/* Period tabs */}
       <div style={{ display: "flex", background: C.dark, padding: "0 20px" }}>
         {[{ id: "weekly", label: "Wekelijks", emoji: "🔥" }, { id: "monthly", label: "Maandelijks", emoji: "📅" }].map(p => (
           <button key={p.id} onClick={() => setPeriod(p.id)} style={{
@@ -1010,7 +1054,7 @@ function RoutinesTab({ routines, setRoutines, filterOwner }) {
       </div>
 
       <div style={{ padding: "16px 18px 0" }}>
-        {/* Score */}
+        {/* Scorebord */}
         <div style={{ background: C.dark, borderRadius: 18, padding: "18px 20px", marginBottom: 18 }}>
           <div style={{ fontSize: 9, letterSpacing: 3, color: C.gold, textTransform: "uppercase", marginBottom: 14, opacity: 0.8 }}>Scorebord</div>
           <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
@@ -1078,7 +1122,7 @@ function RoutinesTab({ routines, setRoutines, filterOwner }) {
 
         {/* Routines */}
         {cats.map(cat => {
-          const items = visible.filter(r => r.cat === cat);
+          const items   = visible.filter(r => r.cat === cat);
           if (!items.length) return null;
           const catInfo = ROUTINE_CATS.find(c => c.id === cat);
           return (
@@ -1115,7 +1159,6 @@ function RoutinesTab({ routines, setRoutines, filterOwner }) {
           );
         })}
 
-        {/* Add form */}
         {adding && (
           <div style={{ background: C.paper, borderRadius: 16, padding: 16, marginBottom: 14, border: `1.5px solid ${C.gold}` }}>
             <div style={{ fontSize: 9, letterSpacing: 2, color: C.gold, marginBottom: 12, textTransform: "uppercase" }}>Nieuwe routine</div>
@@ -1141,8 +1184,7 @@ function RoutinesTab({ routines, setRoutines, filterOwner }) {
               {ROUTINE_CATS.map(c => (
                 <button key={c.id} onClick={() => setNewCat(c.id)} style={{
                   flex: 1, padding: "6px", borderRadius: 10, border: "none",
-                  background: newCat === c.id ? C.dark : C.sand,
-                  color: newCat === c.id ? C.gold : C.brown,
+                  background: newCat === c.id ? C.dark : C.sand, color: newCat === c.id ? C.gold : C.brown,
                   fontSize: 11, cursor: "pointer", fontFamily: "'Georgia', serif",
                 }}>{c.emoji} {c.label}</button>
               ))}
@@ -1169,29 +1211,28 @@ function RoutinesTab({ routines, setRoutines, filterOwner }) {
 
 // ─── RECAP TAB ────────────────────────────────────────────────────────────────
 function RecapTab({ tasks, recaps, setRecaps, setMemory }) {
-  const [view, setView]         = useState("overview");
-  const [svenDone, setSvenDone] = useState(false);
-  const [evaDone, setEvaDone]   = useState(false);
-  const [svenAns, setSvenAns]   = useState(null);
-  const [evaAns, setEvaAns]     = useState(null);
-  const [insight, setInsight]   = useState(null);
+  const [view, setView]               = useState("overview");
+  const [svenDone, setSvenDone]       = useState(false);
+  const [evaDone, setEvaDone]         = useState(false);
+  const [svenAns, setSvenAns]         = useState(null);
+  const [evaAns, setEvaAns]           = useState(null);
+  const [insight, setInsight]         = useState(null);
   const [insightLoading, setInsightLoading] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [reminderDay, setReminderDay]   = useState("zondag");
-  const [reminderTime, setReminderTime] = useState("09:00");
-  const [showAlert, setShowAlert] = useState(false);
+  const [showSettings, setShowSettings]   = useState(false);
+  const [reminderDay, setReminderDay]     = useState("zondag");
+  const [reminderTime, setReminderTime]   = useState("09:00");
+  const [showAlert, setShowAlert]         = useState(false);
 
-  // Check of het vandaag de recap dag is en recap nog niet gedaan
   useEffect(() => {
     const today = new Date().toLocaleDateString("nl-NL", { weekday: "long" });
     const thisWeek = getWeekKey();
-    const alreadyDoneThisWeek = recaps.some(r => {
-      const rWeek = r.date ? `${new Date(r.date).getFullYear()}-W${Math.ceil(((new Date(r.date) - new Date(new Date(r.date).getFullYear(), 0, 1)) / 86400000 + new Date(new Date(r.date).getFullYear(), 0, 1).getDay() + 1) / 7)}` : null;
+    const alreadyDone = recaps.some(r => {
+      const d = r.date ? new Date(r.date) : null;
+      if (!d) return false;
+      const rWeek = `${d.getFullYear()}-W${Math.ceil(((d - new Date(d.getFullYear(), 0, 1)) / 86400000 + new Date(d.getFullYear(), 0, 1).getDay() + 1) / 7)}`;
       return rWeek === thisWeek;
     });
-    if (today === reminderDay && !alreadyDoneThisWeek && !svenDone && !evaDone) {
-      setShowAlert(true);
-    }
+    if (today === reminderDay && !alreadyDone && !svenDone && !evaDone) setShowAlert(true);
   }, [reminderDay, recaps]);
 
   const weekLabel = (() => {
@@ -1204,11 +1245,9 @@ function RecapTab({ tasks, recaps, setRecaps, setMemory }) {
     try {
       const text = await generateRecapInsight(sa, ea, tasks);
       setInsight(text);
-      // Sla recap op
       const newRecap = { week: weekLabel, date: new Date().toISOString(), sven: sa, eva: ea, insight: text };
-      const updated = [newRecap, ...recaps].slice(0, 12);
+      const updated  = [newRecap, ...recaps].slice(0, 12);
       setRecaps(updated);
-      // Update geheugen
       const memSummary = `Recap ${weekLabel}: Sven energie ${sa.energy}/5 (${sa.highlight}), Eva energie ${ea.energy}/5 (${ea.highlight}). TIPO inzicht: ${text}`;
       setMemory(prev => (prev ? `${memSummary}\n\n${prev}` : memSummary).slice(0, 2000));
     } catch (_) { setInsight("Kon geen inzicht genereren. Probeer later opnieuw."); }
@@ -1218,15 +1257,12 @@ function RecapTab({ tasks, recaps, setRecaps, setMemory }) {
   const RecapForm = ({ owner, onDone }) => {
     const o = OWNERS.find(o2 => o2.id === owner);
     const [answers, setAnswers] = useState({ energy: 0 });
-    const [step, setStep] = useState(0);
-    const q = RECAP_QUESTIONS[step];
+    const [step, setStep]       = useState(0);
+    const q      = RECAP_QUESTIONS[step];
     const isLast = step === RECAP_QUESTIONS.length - 1;
     const canNext = q.type === "scale" ? answers.energy > 0 : (answers[q.id] || "").trim().length > 2;
 
-    const next = () => {
-      if (isLast) { onDone(answers); return; }
-      setStep(s => s + 1);
-    };
+    const next = () => { if (isLast) { onDone(answers); return; } setStep(s => s + 1); };
 
     return (
       <div style={{ background: C.paper, borderRadius: 18, padding: 20, border: `1px solid ${C.sand}` }}>
@@ -1293,8 +1329,6 @@ function RecapTab({ tasks, recaps, setRecaps, setMemory }) {
 
   return (
     <div style={{ flex: 1, overflowY: "auto", padding: "18px 18px 0" }}>
-
-      {/* Zondag alert */}
       {showAlert && (
         <div style={{ background: C.gold, borderRadius: 14, padding: "13px 16px", marginBottom: 16, display: "flex", alignItems: "center", gap: 12 }}>
           <span style={{ fontSize: 22 }}>📊</span>
@@ -1306,18 +1340,15 @@ function RecapTab({ tasks, recaps, setRecaps, setMemory }) {
         </div>
       )}
 
-      {/* Settings knop — altijd zichtbaar */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
         <button onClick={() => setShowSettings(!showSettings)} style={{
           padding: "7px 14px", borderRadius: 12, border: `1px solid ${C.sand}`,
-          background: showSettings ? C.dark : C.paper,
-          color: showSettings ? C.gold : C.muted,
+          background: showSettings ? C.dark : C.paper, color: showSettings ? C.gold : C.muted,
           fontSize: 12, cursor: "pointer", fontFamily: "'Georgia', serif",
           display: "flex", alignItems: "center", gap: 6,
         }}>⚙️ Herinnering instellen</button>
       </div>
 
-      {/* Settings */}
       {showSettings && (
         <div style={{ background: C.paper, borderRadius: 18, padding: 18, marginBottom: 16, border: `1px solid ${C.sand}` }}>
           <div style={{ fontSize: 9, letterSpacing: 2, color: C.gold, textTransform: "uppercase", marginBottom: 14 }}>⚙️ Herinnering</div>
@@ -1326,9 +1357,7 @@ function RecapTab({ tasks, recaps, setRecaps, setMemory }) {
             <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
               {["ma","di","wo","do","vr","za","zo"].map((d, i) => {
                 const full = ["maandag","dinsdag","woensdag","donderdag","vrijdag","zaterdag","zondag"][i];
-                return (
-                  <button key={d} onClick={() => setReminderDay(full)} style={{ padding: "6px 10px", borderRadius: 10, border: "none", background: reminderDay === full ? C.dark : C.sand, color: reminderDay === full ? C.gold : C.brown, fontSize: 11, cursor: "pointer" }}>{d}</button>
-                );
+                return <button key={d} onClick={() => setReminderDay(full)} style={{ padding: "6px 10px", borderRadius: 10, border: "none", background: reminderDay === full ? C.dark : C.sand, color: reminderDay === full ? C.gold : C.brown, fontSize: 11, cursor: "pointer" }}>{d}</button>;
               })}
             </div>
           </div>
@@ -1347,11 +1376,8 @@ function RecapTab({ tasks, recaps, setRecaps, setMemory }) {
         </div>
       )}
 
-      {/* Check-in cards */}
       <div style={{ marginBottom: 18 }}>
-        <div style={{ fontSize: 9, letterSpacing: 2, color: C.muted, textTransform: "uppercase", marginBottom: 12 }}>
-          {weekLabel} — invullen
-        </div>
+        <div style={{ fontSize: 9, letterSpacing: 2, color: C.muted, textTransform: "uppercase", marginBottom: 12 }}>{weekLabel} — invullen</div>
         <div style={{ display: "flex", gap: 10 }}>
           {[
             { owner: "sven", done: svenDone, action: () => setView("recap-sven") },
@@ -1376,7 +1402,6 @@ function RecapTab({ tasks, recaps, setRecaps, setMemory }) {
         </div>
       </div>
 
-      {/* TIPO insight als beide klaar */}
       {svenDone && evaDone && (
         <div style={{ background: C.dark, borderRadius: 18, padding: "16px 18px", marginBottom: 18 }}>
           <div style={{ fontSize: 9, letterSpacing: 2, color: C.gold, textTransform: "uppercase", marginBottom: 10 }}>✦ TIPO Inzicht</div>
@@ -1394,7 +1419,6 @@ function RecapTab({ tasks, recaps, setRecaps, setMemory }) {
         </div>
       )}
 
-      {/* Vorige recaps */}
       {recaps.length > 0 && (
         <div style={{ marginBottom: 24 }}>
           <div style={{ fontSize: 9, letterSpacing: 2, color: C.muted, textTransform: "uppercase", marginBottom: 12 }}>Vorige recaps</div>
@@ -1410,7 +1434,7 @@ function RecapTab({ tasks, recaps, setRecaps, setMemory }) {
                       <span style={{ fontSize: 14 }}>{["😴","😐","🙂","😊","🔥"][(a?.energy || 1) - 1]}</span>
                     </div>
                     {a?.highlight && <div style={{ fontSize: 11, color: C.brown, lineHeight: 1.5, fontFamily: "'Georgia', serif" }}>✨ {a.highlight}</div>}
-                    {a?.focus && <div style={{ fontSize: 11, color: C.brown, lineHeight: 1.5, marginTop: 2, fontFamily: "'Georgia', serif" }}>🎯 {a.focus}</div>}
+                    {a?.focus    && <div style={{ fontSize: 11, color: C.brown, lineHeight: 1.5, marginTop: 2, fontFamily: "'Georgia', serif" }}>🎯 {a.focus}</div>}
                   </div>
                 ))}
               </div>
@@ -1428,58 +1452,44 @@ function RecapTab({ tasks, recaps, setRecaps, setMemory }) {
 }
 
 // ─── PROFIEL TAB ──────────────────────────────────────────────────────────────
-
 const BLUEPRINT_PILLARS = [
-  { id: "slaap",     label: "Slaap",                    emoji: "😴", attia: "7-9u per nacht, consistent ritme, koele kamer, geen schermen voor bed" },
-  { id: "bewegen",   label: "Bewegen",                  emoji: "💪", attia: "Zone 2 cardio 3-4x/week, kracht 2-3x/week, VO2max training 1x/week" },
-  { id: "voeding",   label: "Voeding",                  emoji: "🥗", attia: "Voldoende eiwit (1.6-2.2g/kg), weinig ultrabewerkt, stabiele bloedsuiker" },
-  { id: "supps",     label: "Supplementen & Medicatie", emoji: "💊", attia: "Creatine, omega-3, vitamine D3+K2, magnesium — op basis van bloedwaarden" },
-  { id: "emotioneel",label: "Emotionele Gezondheid",    emoji: "🧠", attia: "Stressmanagement, sociale verbinding, therapie/coaching, zingeving" },
+  { id: "slaap",      label: "Slaap",                    emoji: "😴", attia: "7-9u per nacht, consistent ritme, koele kamer, geen schermen voor bed" },
+  { id: "bewegen",    label: "Bewegen",                  emoji: "💪", attia: "Zone 2 cardio 3-4x/week, kracht 2-3x/week, VO2max training 1x/week" },
+  { id: "voeding",    label: "Voeding",                  emoji: "🥗", attia: "Voldoende eiwit (1.6-2.2g/kg), weinig ultrabewerkt, stabiele bloedsuiker" },
+  { id: "supps",      label: "Supplementen & Medicatie", emoji: "💊", attia: "Creatine, omega-3, vitamine D3+K2, magnesium — op basis van bloedwaarden" },
+  { id: "emotioneel", label: "Emotionele Gezondheid",    emoji: "🧠", attia: "Stressmanagement, sociale verbinding, therapie/coaching, zingeving" },
 ];
 
-const BLUEPRINT_KEYS = {
-  sven: "tipo-v5-blueprint-sven",
-  eva:  "tipo-v5-blueprint-eva",
-};
+const BLUEPRINT_KEYS = { sven: "tipo-v5-blueprint-sven", eva: "tipo-v5-blueprint-eva" };
 
 function ProfielTab({ memory, setMemory }) {
-  const [person, setPerson]     = useState("sven");
+  const [person, setPerson]         = useState("sven");
   const [blueprints, setBlueprints] = useState({ sven: {}, eva: {} });
-  const [editing, setEditing]   = useState(null); // pillar id
-  const [draftText, setDraftText] = useState("");
-  const [saved, setSaved]       = useState(false);
+  const [editing, setEditing]       = useState(null);
+  const [draftText, setDraftText]   = useState("");
+  const [saved, setSaved]           = useState(false);
   const [tipoContext, setTipoContext] = useState("");
   const [editContext, setEditContext] = useState(false);
 
-  // Laad vrije context apart
+  useEffect(() => { loadData("tipo-v5-extra-context", "").then(setTipoContext); }, []);
   useEffect(() => {
-    loadData("tipo-v5-extra-context", "").then(setTipoContext);
+    Promise.all([loadData(BLUEPRINT_KEYS.sven, {}), loadData(BLUEPRINT_KEYS.eva, {})]).then(([s, e]) => setBlueprints({ sven: s, eva: e }));
   }, []);
 
-  useEffect(() => {
-    Promise.all([
-      loadData(BLUEPRINT_KEYS.sven, {}),
-      loadData(BLUEPRINT_KEYS.eva, {}),
-    ]).then(([s, e]) => setBlueprints({ sven: s, eva: e }));
-  }, []);
-
-  const buildMemory = (updatedBlueprints, extraContext) => {
-    const bpSven = Object.entries(updatedBlueprints.sven || {}).map(([k, v]) => {
+  const buildMemory = (updatedBp, extraCtx) => {
+    const bpSven = Object.entries(updatedBp.sven || {}).map(([k, v]) => {
       const p = BLUEPRINT_PILLARS.find(x => x.id === k);
       return v ? `Sven ${p?.label}: ${v}` : null;
     }).filter(Boolean).join(" | ");
-    const bpEva = Object.entries(updatedBlueprints.eva || {}).map(([k, v]) => {
+    const bpEva = Object.entries(updatedBp.eva || {}).map(([k, v]) => {
       const p = BLUEPRINT_PILLARS.find(x => x.id === k);
       return v ? `Eva ${p?.label}: ${v}` : null;
     }).filter(Boolean).join(" | ");
-    return [extraContext, bpSven, bpEva].filter(Boolean).join("\n");
+    return [extraCtx, bpSven, bpEva].filter(Boolean).join("\n");
   };
 
   const savePillar = () => {
-    const updated = {
-      ...blueprints,
-      [person]: { ...blueprints[person], [editing]: draftText },
-    };
+    const updated = { ...blueprints, [person]: { ...blueprints[person], [editing]: draftText } };
     setBlueprints(updated);
     saveData(BLUEPRINT_KEYS[person], updated[person]);
     setEditing(null);
@@ -1505,11 +1515,9 @@ function ProfielTab({ memory, setMemory }) {
 
   return (
     <div style={{ flex: 1, overflowY: "auto", padding: "18px 18px 40px" }}>
-
-      {/* Person switcher */}
       <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
         {["sven", "eva"].map(p => {
-          const owner = OWNERS.find(o => o.id === p);
+          const owner  = OWNERS.find(o => o.id === p);
           const filled = Object.keys(blueprints[p] || {}).filter(k => blueprints[p][k]).length;
           return (
             <button key={p} onClick={() => setPerson(p)} style={{
@@ -1526,29 +1534,19 @@ function ProfielTab({ memory, setMemory }) {
         })}
       </div>
 
-      {/* Blueprint pillars */}
       <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 9, letterSpacing: 2, color: C.muted, textTransform: "uppercase", marginBottom: 12 }}>
-          🏗 Leefstijl Blueprint — {o?.label}
-        </div>
-
+        <div style={{ fontSize: 9, letterSpacing: 2, color: C.muted, textTransform: "uppercase", marginBottom: 12 }}>🏗 Leefstijl Blueprint — {o?.label}</div>
         {BLUEPRINT_PILLARS.map(pillar => {
-          const value = currentBp[pillar.id] || "";
+          const value     = currentBp[pillar.id] || "";
           const isEditing = editing === pillar.id;
-
           return (
-            <div key={pillar.id} style={{
-              background: C.paper, borderRadius: 14, padding: "14px 16px", marginBottom: 10,
-              border: `1px solid ${value ? C.sandDark : C.sand}`,
-            }}>
+            <div key={pillar.id} style={{ background: C.paper, borderRadius: 14, padding: "14px 16px", marginBottom: 10, border: `1px solid ${value ? C.sandDark : C.sand}` }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: isEditing ? 10 : value ? 8 : 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ fontSize: 20 }}>{pillar.emoji}</span>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 700, color: C.dark, fontFamily: "'Georgia', serif" }}>{pillar.label}</div>
-                    {!value && !isEditing && (
-                      <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>Nog niet ingevuld</div>
-                    )}
+                    {!value && !isEditing && <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>Nog niet ingevuld</div>}
                   </div>
                 </div>
                 <button onClick={() => { setEditing(isEditing ? null : pillar.id); setDraftText(value); }} style={{
@@ -1556,42 +1554,18 @@ function ProfielTab({ memory, setMemory }) {
                   background: "none", color: C.muted, fontSize: 11, cursor: "pointer",
                 }}>{isEditing ? "Annuleer" : value ? "Bewerk" : "Invullen"}</button>
               </div>
-
-              {/* Attia hint */}
-              {!value && !isEditing && (
-                <div style={{ fontSize: 11, color: C.sandDark, fontStyle: "italic", lineHeight: 1.5, marginTop: 6 }}>
-                  💡 Attia: {pillar.attia}
-                </div>
-              )}
-
-              {/* Current value */}
-              {value && !isEditing && (
-                <div style={{ fontSize: 13, color: C.brown, lineHeight: 1.6, fontFamily: "'Georgia', serif" }}>{value}</div>
-              )}
-
-              {/* Edit mode */}
+              {!value && !isEditing && <div style={{ fontSize: 11, color: C.sandDark, fontStyle: "italic", lineHeight: 1.5, marginTop: 6 }}>💡 Attia: {pillar.attia}</div>}
+              {value && !isEditing && <div style={{ fontSize: 13, color: C.brown, lineHeight: 1.6, fontFamily: "'Georgia', serif" }}>{value}</div>}
               {isEditing && (
                 <div>
-                  <div style={{ fontSize: 11, color: C.sandDark, fontStyle: "italic", marginBottom: 8, lineHeight: 1.5 }}>
-                    💡 {pillar.attia}
-                  </div>
-                  <textarea
-                    autoFocus
-                    value={draftText}
-                    onChange={e => setDraftText(e.target.value)}
-                    placeholder={`Beschrijf ${o?.label}'s protocol voor ${pillar.label.toLowerCase()}...`}
-                    rows={3}
-                    style={{
-                      width: "100%", padding: "10px 12px", borderRadius: 10,
-                      border: `1.5px solid ${o?.color}`, fontSize: 13,
-                      fontFamily: "'Georgia', serif", color: C.dark, outline: "none",
-                      resize: "none", lineHeight: 1.6, background: "white", boxSizing: "border-box",
-                    }}
+                  <div style={{ fontSize: 11, color: C.sandDark, fontStyle: "italic", marginBottom: 8, lineHeight: 1.5 }}>💡 {pillar.attia}</div>
+                  <textarea autoFocus value={draftText} onChange={e => setDraftText(e.target.value)}
+                    placeholder={`Beschrijf ${o?.label}'s protocol voor ${pillar.label.toLowerCase()}...`} rows={3}
+                    style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: `1.5px solid ${o?.color}`, fontSize: 13, fontFamily: "'Georgia', serif", color: C.dark, outline: "none", resize: "none", lineHeight: 1.6, background: "white", boxSizing: "border-box" }}
                   />
-                  <button onClick={savePillar} style={{
-                    marginTop: 8, padding: "8px 18px", borderRadius: 10, border: "none",
-                    background: o?.color, color: "white", fontSize: 13, cursor: "pointer", fontWeight: 700,
-                  }}>Opslaan {saved ? "✓" : ""}</button>
+                  <button onClick={savePillar} style={{ marginTop: 8, padding: "8px 18px", borderRadius: 10, border: "none", background: o?.color, color: "white", fontSize: 13, cursor: "pointer", fontWeight: 700 }}>
+                    Opslaan {saved ? "✓" : ""}
+                  </button>
                 </div>
               )}
             </div>
@@ -1599,7 +1573,6 @@ function ProfielTab({ memory, setMemory }) {
         })}
       </div>
 
-      {/* TIPO Context — extra vrije tekst */}
       <div style={{ background: C.dark, borderRadius: 16, padding: "16px 18px", marginBottom: 20 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
           <div style={{ fontSize: 9, letterSpacing: 2, color: C.gold, textTransform: "uppercase" }}>✦ Extra TIPO Context</div>
@@ -1611,31 +1584,20 @@ function ProfielTab({ memory, setMemory }) {
         </div>
         {editContext ? (
           <div>
-            <textarea
-              value={tipoContext}
-              onChange={e => setTipoContext(e.target.value)}
-              placeholder="Extra context voor TIPO — bijv. knieblessure links, medicatie, persoonlijke doelen, allergieën, zwangerschap details..."
-              rows={4}
-              style={{
-                width: "100%", padding: "10px 12px", borderRadius: 10,
-                border: "none", background: "#2A2218", color: "#E8E0D0", fontSize: 13,
-                fontFamily: "'Georgia', serif", outline: "none", resize: "none",
-                lineHeight: 1.6, boxSizing: "border-box",
-              }}
+            <textarea value={tipoContext} onChange={e => setTipoContext(e.target.value)}
+              placeholder="Extra context voor TIPO — bijv. knieblessure links, medicatie, persoonlijke doelen, allergieën, zwangerschap details..." rows={4}
+              style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "none", background: "#2A2218", color: "#E8E0D0", fontSize: 13, fontFamily: "'Georgia', serif", outline: "none", resize: "none", lineHeight: 1.6, boxSizing: "border-box" }}
             />
-            <button onClick={saveContext} style={{
-              marginTop: 8, padding: "8px 18px", borderRadius: 10, border: "none",
-              background: C.gold, color: C.dark, fontSize: 13, cursor: "pointer", fontWeight: 700,
-            }}>{saved ? "Opgeslagen ✓" : "Opslaan"}</button>
+            <button onClick={saveContext} style={{ marginTop: 8, padding: "8px 18px", borderRadius: 10, border: "none", background: C.gold, color: C.dark, fontSize: 13, cursor: "pointer", fontWeight: 700 }}>
+              {saved ? "Opgeslagen ✓" : "Opslaan"}
+            </button>
           </div>
         ) : (
           <div style={{ fontSize: 13, color: tipoContext ? "#C8C0B0" : "#555", lineHeight: 1.6, fontFamily: "'Georgia', serif" }}>
             {tipoContext || "Nog geen extra context. Gebruik dit voor medische info, blessures, persoonlijke doelen die niet in de Blueprint passen."}
           </div>
         )}
-        <div style={{ fontSize: 10, color: "#555", marginTop: 8 }}>
-          Wordt samen met je Blueprint meegestuurd bij elk TIPO gesprek.
-        </div>
+        <div style={{ fontSize: 10, color: "#555", marginTop: 8 }}>Wordt samen met je Blueprint meegestuurd bij elk TIPO gesprek.</div>
       </div>
     </div>
   );
@@ -1643,37 +1605,36 @@ function ProfielTab({ memory, setMemory }) {
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function App() {
-  const [tab, setTab]           = useState("taken");
-  const [filterOwner, setFilterOwner] = useState(null);
-  const [tasks, setTasks]       = useState(null);
-  const [routines, setRoutines] = useState(null);
-  const [recaps, setRecaps]     = useState([]);
-  const [memory, setMemory]     = useState("");
-  const [loading, setLoading]   = useState(true);
+  const [tab, setTab]                   = useState("taken");
+  const [filterOwner, setFilterOwner]   = useState(null);
+  const [tasks, setTasks]               = useState(null);
+  const [routines, setRoutines]         = useState(null);
+  const [recaps, setRecaps]             = useState([]);
+  const [memory, setMemory]             = useState("");
+  const [loading, setLoading]           = useState(true);
   const [editBabyDate, setEditBabyDate] = useState(false);
   const [babyDateStr, setBabyDateStr]   = useState("2026-09-01");
 
-  // Baby countdown
   const babyDate = new Date(babyDateStr);
   const daysLeft = Math.max(0, Math.ceil((babyDate - new Date()) / 86400000));
   const babyBorn = new Date() > babyDate;
 
   useEffect(() => {
     Promise.all([
-      loadData(KEYS.tasks, DEFAULT_TASKS),
+      loadData(KEYS.tasks,    DEFAULT_TASKS),
       loadData(KEYS.routines, DEFAULT_ROUTINES),
-      loadData(KEYS.recaps, []),
-      loadData(KEYS.memory, ""),
+      loadData(KEYS.recaps,   []),
+      loadData(KEYS.memory,   ""),
     ]).then(([t, r, rc, m]) => {
       setTasks(t); setRoutines(r); setRecaps(rc); setMemory(m);
       setLoading(false);
     });
   }, []);
 
-  useEffect(() => { if (tasks) saveData(KEYS.tasks, tasks); }, [tasks]);
-  useEffect(() => { if (routines) saveData(KEYS.routines, routines); }, [routines]);
-  useEffect(() => { if (recaps.length) saveData(KEYS.recaps, recaps); }, [recaps]);
-  useEffect(() => { if (memory) saveData(KEYS.memory, memory); }, [memory]);
+  useEffect(() => { if (tasks)         saveData(KEYS.tasks,    tasks);    }, [tasks]);
+  useEffect(() => { if (routines)      saveData(KEYS.routines, routines); }, [routines]);
+  useEffect(() => { if (recaps.length) saveData(KEYS.recaps,   recaps);   }, [recaps]);
+  useEffect(() => { if (memory)        saveData(KEYS.memory,   memory);   }, [memory]);
 
   if (loading) return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: C.dark, fontFamily: "'Georgia', serif" }}>
@@ -1741,7 +1702,7 @@ export default function App() {
         {/* Main tabs */}
         <div style={{ display: "flex", gap: 0 }}>
           {[
-            { id: "taken",    label: "Taken",    emoji: "✓" },
+            { id: "taken",    label: "Taken",    emoji: "✓"  },
             { id: "routines", label: "Routines", emoji: "🔄" },
             { id: "recap",    label: "Recap",    emoji: "📊" },
             { id: "profiel",  label: "Profiel",  emoji: "👤" },
@@ -1758,7 +1719,7 @@ export default function App() {
 
       {/* Tab content */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        {tab === "taken"    && <TasksTab tasks={tasks} setTasks={setTasks} memory={memory} filterOwner={filterOwner} />}
+        {tab === "taken"    && <TasksTab tasks={tasks} setTasks={setTasks} memory={memory} recaps={recaps} filterOwner={filterOwner} />}
         {tab === "routines" && <RoutinesTab routines={routines} setRoutines={setRoutines} filterOwner={filterOwner} />}
         {tab === "recap"    && <RecapTab tasks={tasks} recaps={recaps} setRecaps={setRecaps} setMemory={setMemory} />}
         {tab === "profiel"  && <ProfielTab memory={memory} setMemory={setMemory} />}
@@ -1772,6 +1733,3 @@ export default function App() {
     </div>
   );
 }
-
-const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(React.createElement(App));
