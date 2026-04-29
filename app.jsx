@@ -1,9 +1,9 @@
-// TIPO Brain v6
+// TIPO Brain v7
 // Tilanus Poorthuis Gezinsassistent
 // Sven & Eva — iPad keuken app
-// v6: Proactieve AI-assistent — opent automatisch met gepersonaliseerde analyse
+// v7: Kaart-chat met web search · Bronnen per kaart · Gezins-DNA blueprint
 
-const { useState, useEffect, useRef, useCallback } = React;
+const { useState, useEffect, useRef } = React;
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const C = {
@@ -43,9 +43,9 @@ const CATEGORIES = [
 ];
 
 const LISTS = [
-  { id: "nu",   label: "Nu",        emoji: "🔥", color: C.red,    light: C.redLight },
-  { id: "week", label: "Deze week", emoji: "📅", color: "#8B5E1A", light: "#FDF5E8" },
-  { id: "ooit", label: "Ooit",      emoji: "🌱", color: C.green,  light: C.greenBg },
+  { id: "nu",   label: "Nu",        emoji: "🔥", color: C.red,     light: C.redLight },
+  { id: "week", label: "Deze week", emoji: "📅", color: "#8B5E1A", light: "#FDF5E8"  },
+  { id: "ooit", label: "Ooit",      emoji: "🌱", color: C.green,   light: C.greenBg  },
 ];
 
 const ROUTINE_CATS = [
@@ -54,22 +54,68 @@ const ROUTINE_CATS = [
   { id: "baby",       label: "Baby",       emoji: "👶" },
 ];
 
+// ─── Gezins-DNA secties ───────────────────────────────────────────────────────
+const DNA_SECTIONS = [
+  {
+    id: "thuis",
+    label: "Thuis & Omgeving",
+    emoji: "🏡",
+    info: "Waar wonen jullie nu, wat voor woning, wat voor buurt? Wat zijn jullie wensen voor een nieuw huis? TIPO gebruikt dit bij klusopdrachten, kinderopvang zoeken en woonadvies.",
+    placeholder: "Bijv. Helmond, rijtjeswoning, tuin. Dromen over een vrijstaand huis buiten de stad, veel groen, binnen 30 min van Eindhoven...",
+  },
+  {
+    id: "waarden",
+    label: "Waarden & Leefstijl",
+    emoji: "🌿",
+    info: "Wat vinden jullie belangrijk in het dagelijks leven? Denk aan voeding, duurzaamheid, bewuste consumptie. TIPO gebruikt dit bij productadvies, babyspullen en aankoopbeslissingen.",
+    placeholder: "Bijv. biologisch eten zoveel mogelijk, plasticvrij, bewuste aankopen, liever kwaliteit dan kwantiteit, duurzame merken...",
+  },
+  {
+    id: "gezin",
+    label: "Gezin & Opvoeding",
+    emoji: "👨‍👩‍👧",
+    info: "Hoe willen jullie als gezin leven? Opvoedvisie, activiteiten, tradities, wat voor omgeving voor jullie kind. TIPO gebruikt dit bij kinderopvang, babyadvies en gezinsplanning.",
+    placeholder: "Bijv. veel buiten zijn, natuur, avontuur. Bewuste schermtijd. Warme en open sfeer thuis. Talen, muziek, sport...",
+  },
+  {
+    id: "vrije_tijd",
+    label: "Vrije tijd & Vakanties",
+    emoji: "✈️",
+    info: "Wat voor vakanties en uitjes passen bij jullie? Natuur of cultuur, actief of ontspannen, dichtbij of ver weg. TIPO gebruikt dit bij reisadvies en weekendtips.",
+    placeholder: "Bijv. camping in de Ardennen, wandelen in de bergen, liever kleine B&B dan resort, Europa boven verre vluchten...",
+  },
+  {
+    id: "financieel",
+    label: "Financiële Kaders",
+    emoji: "💶",
+    info: "Geen details — alleen globale kaders. Bewust met geld, investeren in kwaliteit, uitbesteden of zelf doen? TIPO gebruikt dit om offertes te beoordelen en advies te schalen.",
+    placeholder: "Bijv. kwaliteit boven prijs, liever 1x goed dan 2x goedkoop. Klussen zelf doen waar mogelijk. Sparen voor huis heeft prioriteit...",
+  },
+  {
+    id: "doelen",
+    label: "Gezamenlijke Doelen",
+    emoji: "🎯",
+    info: "Waar willen jullie over 3-5 jaar staan als gezin? Groot of klein — het helpt TIPO om taken te prioriteren en advies in perspectief te plaatsen.",
+    placeholder: "Bijv. eigen huis kopen, Sven meer rust in werk, Eva haar eigen praktijk, gezond en bewust leven met de baby...",
+  },
+];
+
 const DEFAULT_TASKS = [
-  { id: 1, text: "Huisarts bellen voor baby check-up", done: false, list: "nu", cat: "baby", owner: "eva", notes: "Vraag ook naar vaccinaties planning", deadline: null, milestones: [], aiContent: null },
-  { id: 2, text: "Luiers bijbestellen", done: false, list: "nu", cat: "baby", owner: "sven", notes: "", deadline: null, milestones: [], aiContent: null },
+  { id: 1, text: "Huisarts bellen voor baby check-up", done: false, list: "nu", cat: "baby", owner: "eva", notes: "Vraag ook naar vaccinaties planning", deadline: null, milestones: [], bronnen: [], cardChat: [] },
+  { id: 2, text: "Luiers bijbestellen", done: false, list: "nu", cat: "baby", owner: "sven", notes: "", deadline: null, milestones: [], bronnen: [], cardChat: [] },
   { id: 3, text: "Kinderopvang vergelijken", done: false, list: "ooit", cat: "baby", owner: "samen", notes: "De Paddestoel, Hummelhoeve, KinderRijk", deadline: null,
     milestones: [
       { id: "m1", text: "Lijst met opties maken", done: true,  owner: "eva" },
       { id: "m2", text: "3 locaties bezoeken",    done: false, owner: "samen" },
       { id: "m3", text: "Keuze maken",            done: false, owner: "samen" },
-    ], aiContent: null },
+    ], bronnen: [], cardChat: [] },
   { id: 4, text: "Hypotheek adviesgesprek plannen", done: false, list: "ooit", cat: "nieuw_huis", owner: "sven", notes: "Adviseur: Jan de Vries 06-12345678", deadline: null,
     milestones: [
       { id: "m4", text: "Adviseur contacteren",  done: true,  owner: "sven" },
       { id: "m5", text: "Documenten verzamelen", done: true,  owner: "samen" },
       { id: "m6", text: "Gesprek inplannen",     done: false, owner: "sven" },
-    ], aiContent: null },
-  { id: 5, text: "Zomervakantie bestemming kiezen", done: false, list: "ooit", cat: "vakantie", owner: "samen", notes: "Ideeën: Zuid-Frankrijk, Italië, Kroatië", deadline: null, milestones: [], aiContent: null },
+    ], bronnen: [], cardChat: [] },
+  { id: 5, text: "Zomervakantie bestemming kiezen", done: false, list: "ooit", cat: "vakantie", owner: "samen", notes: "Ideeën: Zuid-Frankrijk, Italië, Kroatië", deadline: null, milestones: [], bronnen: [], cardChat: [] },
 ];
 
 const DEFAULT_ROUTINES = {
@@ -93,9 +139,9 @@ const DEFAULT_ROUTINES = {
 
 const RECAP_QUESTIONS = [
   { id: "energy",    label: "Hoe was je energieniveau deze week?", type: "scale", icon: "⚡" },
-  { id: "highlight", label: "Wat ging goed of waar ben je trots op?", type: "text", icon: "✨", placeholder: "Bijv. Zone 2 elke dag gehaald, goed gesprek gehad…" },
-  { id: "struggle",  label: "Waar liep je tegenaan?",              type: "text", icon: "🌊", placeholder: "Bijv. weinig slaap, druk op werk…" },
-  { id: "focus",     label: "Wat wil je volgende week beter doen?", type: "text", icon: "🎯", placeholder: "Bijv. eerder naar bed, meer bewegen…" },
+  { id: "highlight", label: "Wat ging goed of waar ben je trots op?", type: "text", icon: "✨", placeholder: "Bijv. Zone 2 elke dag gehaald…" },
+  { id: "struggle",  label: "Waar liep je tegenaan?",               type: "text", icon: "🌊", placeholder: "Bijv. weinig slaap, druk op werk…" },
+  { id: "focus",     label: "Wat wil je volgende week beter doen?",  type: "text", icon: "🎯", placeholder: "Bijv. eerder naar bed…" },
 ];
 
 let nextId  = 20;
@@ -125,12 +171,11 @@ const getMonthKey = () => {
 
 // ─── Storage ──────────────────────────────────────────────────────────────────
 const KEYS = {
-  tasks:         "tipo-v5-tasks",
-  routines:      "tipo-v5-routines",
-  recaps:        "tipo-v5-recaps",
-  memory:        "tipo-v5-memory",
-  blueprintSven: "tipo-v5-blueprint-sven",
-  blueprintEva:  "tipo-v5-blueprint-eva",
+  tasks:    "tipo-v5-tasks",
+  routines: "tipo-v5-routines",
+  recaps:   "tipo-v5-recaps",
+  memory:   "tipo-v5-memory",
+  dna:      "tipo-v7-dna",
 };
 
 async function apiCall(body) {
@@ -166,13 +211,14 @@ async function callClaude(messages, system, maxTokens = 1000) {
   return data.content?.find(b => b.type === "text")?.text || "";
 }
 
+// Globale TIPO chat
 async function askTIPO(messages, tasks, memory) {
   const system = `Je bent TIPO, de persoonlijke AI-assistent van Sven en Eva Tilanus-Poorthuis. Ze verwachten hun eerste baby in september 2026 en beheren samen hun huishouden, gezondheid en toekomstplannen.
 
-${memory ? `Geheugen uit eerdere gesprekken:\n${memory}\n` : ""}
+${memory ? `Achtergrond & geheugen:\n${memory}\n` : ""}
 
 Huidige taken:
-${JSON.stringify(tasks, null, 2)}
+${JSON.stringify(tasks.map(t => ({ id: t.id, text: t.text, list: t.list, cat: t.cat, owner: t.owner, done: t.done, deadline: t.deadline, milestones: t.milestones?.length })), null, 2)}
 
 Owners: sven, eva, samen | Lijsten: nu, week, ooit | Categorieën: huis, baby, financieel, vakantie, nieuw_huis, overig
 
@@ -190,7 +236,7 @@ Als de gebruiker acties wil, voeg een <actions> blok toe aan het EINDE:
 ]
 </actions>
 
-Reageer altijd in het Nederlands. Wees warm, concreet en beknopt. Je kent Peter Attia's principes (Zone 2, kracht, slaap, voeding) en GTD/Tiny Habits methodieken.`;
+Reageer altijd in het Nederlands. Wees warm, concreet en beknopt.`;
 
   const text = await callClaude(messages, system);
   const match = text.match(/<actions>([\s\S]*?)<\/actions>/);
@@ -199,104 +245,92 @@ Reageer altijd in het Nederlands. Wees warm, concreet en beknopt. Je kent Peter 
   return { text: text.replace(/<actions>[\s\S]*?<\/actions>/, "").trim(), actions };
 }
 
-async function prepareTask(task) {
-  const system = `Je bent TIPO, assistent van Sven en Eva (baby verwacht september 2026).
+// Kaart-specifieke TIPO chat met web search
+async function askCardTIPO(messages, task, memory, dna) {
+  const system = `Je bent TIPO, de persoonlijke AI-assistent van Sven en Eva Tilanus-Poorthuis. Je helpt hen nu specifiek met deze taak/project:
 
-Geef een JSON response met EXACT deze structuur (geen markdown, geen extra tekst):
-{
-  "samenvatting": "2-3 zinnen over wat deze taak inhoudt en waarom het belangrijk is",
-  "aandachtspunten": ["punt 1", "punt 2", "punt 3"],
-  "bronnen": ["bron of tip 1", "bron of tip 2"],
-  "milestones": [
-    {"text": "concrete stap 1", "owner": "sven|eva|samen"},
-    {"text": "concrete stap 2", "owner": "sven|eva|samen"}
-  ]
+Taak: "${task.text}"
+Categorie: ${task.cat} | Lijst: ${task.list} | Owner: ${task.owner}
+Notities: ${task.notes || "geen"}
+Deadline: ${task.deadline || "niet ingesteld"}
+Huidige mijlpalen: ${JSON.stringify(task.milestones || [])}
+Huidige bronnen: ${JSON.stringify(task.bronnen || [])}
+
+${memory ? `Persoonlijke achtergrond Sven & Eva:\n${memory}\n` : ""}
+${dna ? `Gezins-DNA:\n${dna}\n` : ""}
+
+Jouw rol als kaartassistent:
+- Help actief met onderzoek, vergelijking, advies voor DEZE taak
+- Zoek informatie op als dat nuttig is
+- Stel concrete mijlpalen voor als dat logisch is
+- Stel bronnen/links voor die relevant zijn
+- Denk mee als sparringspartner
+
+Als je acties wilt uitvoeren op de kaart, voeg een <card_actions> blok toe aan het EINDE:
+<card_actions>
+[
+  { "type": "add_milestone", "text": "concrete stap", "owner": "sven|eva|samen" },
+  { "type": "done_milestone", "id": "m123" },
+  { "type": "add_bron", "label": "omschrijving", "url": "https://..." },
+  { "type": "update_notes", "notes": "nieuwe notitie tekst" }
+]
+</card_actions>
+
+Reageer in het Nederlands. Wees concreet, praktisch en proactief. Gebruik web search als je actuele info nodig hebt.`;
+
+  const data = await apiCall({
+    model: "claude-sonnet-4-5",
+    max_tokens: 1500,
+    system,
+    messages,
+    tools: [{ type: "web_search_20250305", name: "web_search" }],
+  });
+
+  const text = (data.content || []).filter(b => b.type === "text").map(b => b.text).join("\n");
+  const match = text.match(/<card_actions>([\s\S]*?)<\/card_actions>/);
+  let actions = [];
+  if (match) { try { actions = JSON.parse(match[1].trim()); } catch (_) {} }
+  return { text: text.replace(/<card_actions>[\s\S]*?<\/card_actions>/, "").trim(), actions };
 }
 
-Geef 3-6 concrete, afvinkbare milestones. Wijs eigenaren toe op basis van logische verantwoordelijkheid. Schrijf in het Nederlands.`;
-
-  const raw = await callClaude(
-    [{ role: "user", content: `Bereid voor: "${task.text}"\n\nContext: ${task.notes || "geen"}` }],
-    system, 1200
-  );
-  try {
-    const clean = raw.replace(/```json|```/g, "").trim();
-    return JSON.parse(clean);
-  } catch (_) {
-    return { samenvatting: raw, aandachtspunten: [], bronnen: [], milestones: [] };
-  }
-}
-
-async function generateRecapInsight(svenAnswers, evaAnswers, tasks) {
-  const system = `Je bent TIPO, assistent van Sven en Eva. Analyseer hun wekelijkse recap en geef een concreet, persoonlijk inzicht van max 3 zinnen. Focus op patronen, prioriteiten en één concrete aanbeveling. Nederlands, warm maar direct.`;
-  return callClaude(
-    [{ role: "user", content: `Sven's week:\n- Energie: ${svenAnswers.energy}/5\n- Goed: ${svenAnswers.highlight}\n- Moeilijk: ${svenAnswers.struggle}\n- Focus: ${svenAnswers.focus}\n\nEva's week:\n- Energie: ${evaAnswers.energy}/5\n- Goed: ${evaAnswers.highlight}\n- Moeilijk: ${evaAnswers.struggle}\n- Focus: ${evaAnswers.focus}\n\nOpen taken: ${tasks.filter(t => !t.done).length}` }],
-    system, 400
-  );
-}
-
-// ─── NIEUW v6: Proactieve begroeting ─────────────────────────────────────────
+// Proactieve begroeting
 async function generateProactiveGreeting(tasks, memory, recaps) {
   const now = new Date();
   const hour = now.getHours();
   const dayGreeting = hour < 12 ? "Goedemorgen" : hour < 18 ? "Goedemiddag" : "Goedenavond";
   const today = now.toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long" });
 
-  // Overschreden deadlines
-  const overdue = tasks.filter(t => !t.done && t.deadline && new Date(t.deadline) < now);
-
-  // Deadlines binnen 3 dagen
-  const dueSoon = tasks.filter(t => {
+  const overdue   = tasks.filter(t => !t.done && t.deadline && new Date(t.deadline) < now);
+  const dueSoon   = tasks.filter(t => {
     if (t.done || !t.deadline) return false;
     const days = Math.ceil((new Date(t.deadline) - now) / 86400000);
     return days >= 0 && days <= 3;
   });
-
-  // Taakverdeling
-  const svenOpen = tasks.filter(t => !t.done && t.owner === "sven").length;
-  const evaOpen  = tasks.filter(t => !t.done && t.owner === "eva").length;
-  const samenOpen = tasks.filter(t => !t.done && t.owner === "samen").length;
-
-  // "Nu"-taken zonder deadline
+  const svenOpen  = tasks.filter(t => !t.done && t.owner === "sven").length;
+  const evaOpen   = tasks.filter(t => !t.done && t.owner === "eva").length;
   const urgentNoDL = tasks.filter(t => !t.done && t.list === "nu" && !t.deadline);
-
-  // Laatste recap
-  const lastRecap = recaps?.[0];
+  const lastRecap  = recaps?.[0];
 
   const contextLines = [
     `${dayGreeting}, vandaag is het ${today}.`,
-    `Open taken: ${tasks.filter(t => !t.done).length} totaal — Sven: ${svenOpen}, Eva: ${evaOpen}, Samen: ${samenOpen}.`,
-    overdue.length
-      ? `OVERSCHREDEN deadlines (${overdue.length}): ${overdue.map(t => `"${t.text}"`).join(", ")}.`
-      : null,
-    dueSoon.length
-      ? `Deadlines binnen 3 dagen: ${dueSoon.map(t => {
-          const days = Math.ceil((new Date(t.deadline) - now) / 86400000);
-          return `"${t.text}" (${days === 0 ? "vandaag" : days === 1 ? "morgen" : `${days} dagen`})`;
-        }).join(", ")}.`
-      : null,
-    urgentNoDL.length
-      ? `"Nu"-taken zonder deadline (${urgentNoDL.length}): ${urgentNoDL.slice(0, 3).map(t => `"${t.text}"`).join(", ")}.`
-      : null,
-    lastRecap
-      ? `Laatste recap (${lastRecap.week}): Sven energie ${lastRecap.sven?.energy}/5, Eva energie ${lastRecap.eva?.energy}/5. TIPO inzicht destijds: "${lastRecap.insight}".`
-      : "Nog geen wekelijkse recap ingevuld.",
-    memory ? `Persoonlijke context:\n${memory.slice(0, 500)}` : null,
+    `Open taken: ${tasks.filter(t => !t.done).length} totaal — Sven: ${svenOpen}, Eva: ${evaOpen}.`,
+    overdue.length  ? `OVERSCHREDEN deadlines (${overdue.length}): ${overdue.map(t => `"${t.text}"`).join(", ")}.` : null,
+    dueSoon.length  ? `Deadlines binnen 3 dagen: ${dueSoon.map(t => `"${t.text}"`).join(", ")}.` : null,
+    urgentNoDL.length ? `"Nu"-taken zonder deadline: ${urgentNoDL.slice(0, 3).map(t => `"${t.text}"`).join(", ")}.` : null,
+    lastRecap ? `Laatste recap: Sven energie ${lastRecap.sven?.energy}/5, Eva energie ${lastRecap.eva?.energy}/5.` : null,
+    memory ? `Context: ${memory.slice(0, 300)}` : null,
   ].filter(Boolean).join("\n");
 
-  const system = `Je bent TIPO, de persoonlijke AI-assistent van Sven en Eva Tilanus-Poorthuis. Je opent nu proactief het gesprek — zij hebben de chat zojuist geopend.
+  const system = `Je bent TIPO. Schrijf een beknopt, warm openingsbericht (max 3-4 zinnen). Noem wat er echt opvalt. Sluit af met één gerichte vraag. Geen generieke begroeting. Nederlands, geen bullets.`;
 
-Schrijf een beknopt, warm en direct openingsbericht van maximaal 3-4 zinnen. Regels:
-- Geen generieke "hoe kan ik helpen" — wees specifiek over wat je ziet
-- Noem het meest urgente of opvallende bij naam (deadline, taak, patroon)
-- Sluit af met één concrete vraag of suggestie
-- Schrijf in het Nederlands, geen bullet points, gewone zinnen
-- Als er niets urgents is: geef een positieve observatie en stel een proactieve vraag`;
+  return callClaude([{ role: "user", content: contextLines }], system, 300);
+}
 
+async function generateRecapInsight(svenAnswers, evaAnswers, tasks) {
+  const system = `Je bent TIPO. Analyseer de wekelijkse recap en geef een concreet inzicht van max 3 zinnen. Focus op patronen en één aanbeveling. Nederlands, warm maar direct.`;
   return callClaude(
-    [{ role: "user", content: `Situatie:\n${contextLines}` }],
-    system,
-    350
+    [{ role: "user", content: `Sven: energie ${svenAnswers.energy}/5, goed: ${svenAnswers.highlight}, moeilijk: ${svenAnswers.struggle}, focus: ${svenAnswers.focus}\nEva: energie ${evaAnswers.energy}/5, goed: ${evaAnswers.highlight}, moeilijk: ${evaAnswers.struggle}, focus: ${evaAnswers.focus}\nOpen taken: ${tasks.filter(t => !t.done).length}` }],
+    system, 400
   );
 }
 
@@ -397,72 +431,194 @@ function MilestoneEditor({ milestones, onChange, color }) {
   );
 }
 
-function AIContent({ content, loading, color, onAddMilestones }) {
-  if (loading) return (
-    <div style={{ display: "flex", gap: 5, padding: "14px 0" }}>
-      {[0,1,2].map(i => <div key={i} style={{ width: 6, height: 6, borderRadius: "50%", background: color, animation: `tipoFade 1.2s ${i*0.2}s infinite` }} />)}
-    </div>
-  );
-  if (!content) return null;
+// ─── Bronnen editor ───────────────────────────────────────────────────────────
+function BronnenEditor({ bronnen, onChange, color }) {
+  const [newLabel, setNewLabel] = useState("");
+  const [newUrl, setNewUrl]     = useState("");
+  const [adding, setAdding]     = useState(false);
 
-  if (typeof content === "object" && content.samenvatting) {
-    return (
-      <div style={{ fontSize: 13, lineHeight: 1.7 }}>
-        <div style={{ color: "#E8E4DC", marginBottom: 12 }}>{content.samenvatting}</div>
-        {content.aandachtspunten?.length > 0 && (
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 9, letterSpacing: 2, color: color, textTransform: "uppercase", marginBottom: 6 }}>Aandachtspunten</div>
-            {content.aandachtspunten.map((p, i) => (
-              <div key={i} style={{ color: "#D0CAC0", paddingLeft: 12, marginBottom: 3 }}>· {p}</div>
-            ))}
-          </div>
-        )}
-        {content.bronnen?.length > 0 && (
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 9, letterSpacing: 2, color: color, textTransform: "uppercase", marginBottom: 6 }}>Bronnen & Tips</div>
-            {content.bronnen.map((b, i) => (
-              <div key={i} style={{ color: "#D0CAC0", paddingLeft: 12, marginBottom: 3 }}>· {b}</div>
-            ))}
-          </div>
-        )}
-        {content.milestones?.length > 0 && (
-          <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: 12, padding: "12px 14px", marginTop: 4 }}>
-            <div style={{ fontSize: 9, letterSpacing: 2, color: color, textTransform: "uppercase", marginBottom: 10 }}>🎯 Voorgestelde mijlpalen</div>
-            {content.milestones.map((m, i) => {
-              const o = OWNERS.find(o => o.id === m.owner) || OWNERS[2];
-              return (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                  <div style={{ width: 18, height: 18, borderRadius: 4, border: "1.5px solid #555", flexShrink: 0 }} />
-                  <span style={{ flex: 1, color: "#D0CAC0", fontSize: 13 }}>{m.text}</span>
-                  <span style={{ fontSize: 10, color: o.color, background: `${o.color}22`, padding: "2px 7px", borderRadius: 8 }}>{o.label}</span>
-                </div>
-              );
-            })}
-            <button onClick={() => onAddMilestones(content.milestones)} style={{
-              marginTop: 10, width: "100%", padding: "9px", borderRadius: 10, border: "none",
-              background: color, color: "#1E1A14", fontSize: 12, fontWeight: 700, cursor: "pointer",
-              fontFamily: "'Georgia', serif",
-            }}>✓ Voeg alle mijlpalen toe</button>
-          </div>
-        )}
-      </div>
-    );
-  }
+  const add = () => {
+    if (!newLabel.trim() || !newUrl.trim()) return;
+    const url = newUrl.startsWith("http") ? newUrl : `https://${newUrl}`;
+    onChange([...bronnen, { id: `b${Date.now()}`, label: newLabel.trim(), url }]);
+    setNewLabel(""); setNewUrl(""); setAdding(false);
+  };
+  const remove = (id) => onChange(bronnen.filter(b => b.id !== id));
 
   return (
-    <div style={{ fontSize: 13, color: "#E8E4DC", lineHeight: 1.75 }}>
-      {String(content).split("\n").map((line, i) => {
-        if (line.startsWith("## ")) return <div key={i} style={{ fontWeight: 700, fontSize: 14, color: C.goldLight, marginTop: 14, marginBottom: 5 }}>{line.slice(3)}</div>;
-        if (line.startsWith("- ")) return <div key={i} style={{ paddingLeft: 14, marginBottom: 3, color: "#D0CAC0" }}>· {line.slice(2)}</div>;
-        if (!line.trim()) return <div key={i} style={{ height: 8 }} />;
-        return <div key={i} style={{ marginBottom: 3 }}>{line}</div>;
-      })}
+    <div>
+      {bronnen.map(b => (
+        <div key={b.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: `1px solid ${C.sand}` }}>
+          <span style={{ fontSize: 14, flexShrink: 0 }}>🔗</span>
+          <a href={b.url} target="_blank" rel="noopener noreferrer" style={{ flex: 1, fontSize: 13, color: color, textDecoration: "none", lineHeight: 1.4, wordBreak: "break-all" }}>
+            {b.label}
+          </a>
+          <button onClick={() => remove(b.id)} style={{ background: "none", border: "none", color: C.sandDark, cursor: "pointer", fontSize: 16, padding: "0 2px", flexShrink: 0 }}>×</button>
+        </div>
+      ))}
+      {adding ? (
+        <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+          <input value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="Omschrijving (bijv. Loodgieter Helmond)"
+            style={{ padding: "8px 12px", borderRadius: 10, border: `1px solid ${C.sand}`, fontSize: 13, fontFamily: "'Georgia', serif", background: C.paper, outline: "none", color: C.dark }}
+          />
+          <input value={newUrl} onChange={e => setNewUrl(e.target.value)} placeholder="Link (bijv. www.example.nl)" onKeyDown={e => e.key === "Enter" && add()}
+            style={{ padding: "8px 12px", borderRadius: 10, border: `1px solid ${C.sand}`, fontSize: 13, fontFamily: "'Georgia', serif", background: C.paper, outline: "none", color: C.dark }}
+          />
+          <div style={{ display: "flex", gap: 6 }}>
+            <button onClick={() => setAdding(false)} style={{ flex: 1, padding: "7px", borderRadius: 9, border: `1px solid ${C.sand}`, background: "none", color: C.muted, fontSize: 12, cursor: "pointer" }}>Annuleer</button>
+            <button onClick={add} style={{ flex: 2, padding: "7px", borderRadius: 9, border: "none", background: color, color: "white", fontSize: 12, cursor: "pointer", fontWeight: 700 }}>Toevoegen</button>
+          </div>
+        </div>
+      ) : (
+        <button onClick={() => setAdding(true)} style={{
+          marginTop: 8, width: "100%", padding: "7px", borderRadius: 9,
+          border: `1px dashed ${color}`, background: "transparent", color: color,
+          fontSize: 12, cursor: "pointer", fontFamily: "'Georgia', serif",
+        }}>+ Bron toevoegen</button>
+      )}
+    </div>
+  );
+}
+
+// ─── Kaart-chat ───────────────────────────────────────────────────────────────
+function CardChat({ task, onUpdateTask, memory, dna, onClose }) {
+  const list = getList(task.list);
+  const [msgs, setMsgs]       = useState(task.cardChat || []);
+  const [input, setInput]     = useState("");
+  const [loading, setLoading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const chatEndRef = useRef(null);
+  const recognitionRef = useRef(null);
+
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs]);
+
+  // Sla chat op in de taak
+  useEffect(() => { onUpdateTask({ cardChat: msgs }); }, [msgs]);
+
+  const applyCardActions = (actions, currentTask) => {
+    let updated = { ...currentTask };
+    for (const a of actions) {
+      if (a.type === "add_milestone") {
+        const newMs = [...(updated.milestones || []), { id: `m${nextMid++}`, text: a.text, done: false, owner: a.owner || "samen" }];
+        updated = { ...updated, milestones: newMs };
+      } else if (a.type === "done_milestone") {
+        updated = { ...updated, milestones: (updated.milestones || []).map(m => m.id === a.id ? { ...m, done: true } : m) };
+      } else if (a.type === "add_bron") {
+        const newB = [...(updated.bronnen || []), { id: `b${Date.now()}`, label: a.label, url: a.url }];
+        updated = { ...updated, bronnen: newB };
+      } else if (a.type === "update_notes") {
+        updated = { ...updated, notes: a.notes };
+      }
+    }
+    return updated;
+  };
+
+  const send = async () => {
+    if (!input.trim() || loading) return;
+    const userMsg = { role: "user", content: input.trim() };
+    const newMsgs = [...msgs, userMsg];
+    setMsgs(newMsgs);
+    setInput("");
+    setLoading(true);
+    try {
+      const { text, actions } = await askCardTIPO(
+        newMsgs.map(m => ({ role: m.role, content: m.content })),
+        task, memory, dna
+      );
+      if (actions.length > 0) {
+        const updated = applyCardActions(actions, task);
+        onUpdateTask(updated);
+      }
+      setMsgs(prev => [...prev, { role: "assistant", content: text }]);
+    } catch {
+      setMsgs(prev => [...prev, { role: "assistant", content: "Sorry, er ging iets mis. Probeer opnieuw." }]);
+    }
+    setLoading(false);
+  };
+
+  const startListening = () => {
+    if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) return;
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SR();
+    recognition.lang = "nl-NL";
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.onresult  = (e) => { setInput(e.results[0][0].transcript); setIsListening(false); };
+    recognition.onerror   = () => setIsListening(false);
+    recognition.onend     = () => setIsListening(false);
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsListening(true);
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      {/* Header */}
+      <div style={{ padding: "12px 16px 10px", borderBottom: `1px solid #2A2520`, flexShrink: 0 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ color: C.gold, fontSize: 10, letterSpacing: 2, textTransform: "uppercase" }}>✦ TIPO · Kaartassistent</div>
+            <div style={{ color: "#666", fontSize: 11, marginTop: 2, fontFamily: "'Georgia', serif" }} numberOfLines={1}>
+              {task.text.length > 40 ? task.text.slice(0, 40) + "…" : task.text}
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: 22 }}>×</button>
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "12px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+        {msgs.length === 0 && (
+          <div style={{ textAlign: "center", padding: "24px 0", color: "#555", fontSize: 13, fontFamily: "'Georgia', serif", lineHeight: 1.6 }}>
+            <div style={{ fontSize: 28, marginBottom: 10 }}>✦</div>
+            Ik help je met <strong style={{ color: C.gold }}>{task.text}</strong>.<br/>
+            Stel me een vraag, laat me onderzoek doen,<br/>of vraag me mijlpalen aan te maken.
+          </div>
+        )}
+        {msgs.map((msg, i) => (
+          <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
+            <div style={{
+              maxWidth: "88%", padding: "10px 14px",
+              borderRadius: msg.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
+              background: msg.role === "user" ? C.gold : "#252218",
+              color: msg.role === "user" ? C.dark : "#E8E0D0",
+              fontSize: 14, lineHeight: 1.6, fontFamily: "'Georgia', serif",
+              whiteSpace: "pre-wrap",
+            }}>{msg.content}</div>
+          </div>
+        ))}
+        {loading && (
+          <div style={{ display: "flex", gap: 5, padding: "10px 14px", background: "#252218", borderRadius: "18px 18px 18px 4px", width: "fit-content" }}>
+            {[0,1,2].map(i => <div key={i} style={{ width: 6, height: 6, borderRadius: "50%", background: C.gold, animation: `tipoFade 1.2s ${i*0.2}s infinite` }} />)}
+          </div>
+        )}
+        <div ref={chatEndRef} />
+      </div>
+
+      {/* Input */}
+      <div style={{ padding: "10px 14px 16px", borderTop: "1px solid #252218", flexShrink: 0, display: "flex", gap: 8, alignItems: "center" }}>
+        <button onClick={startListening} style={{
+          width: 40, height: 40, borderRadius: "50%", border: "none", flexShrink: 0,
+          background: isListening ? C.red : "#2A2520", color: isListening ? "white" : C.gold,
+          fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+        }}>🎙️</button>
+        <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && send()}
+          placeholder="Vraag TIPO iets over deze taak…"
+          style={{ flex: 1, padding: "10px 14px", borderRadius: 22, border: "1px solid #333", background: "#1A1710", color: "#E8E0D0", fontSize: 13, fontFamily: "'Georgia', serif", outline: "none" }}
+        />
+        <button onClick={send} disabled={loading} style={{
+          width: 40, height: 40, borderRadius: "50%", border: "none", flexShrink: 0,
+          background: loading ? "#333" : C.gold, color: C.dark,
+          cursor: loading ? "default" : "pointer", fontSize: 16,
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>↑</button>
+      </div>
     </div>
   );
 }
 
 // ─── TAKEN TAB ────────────────────────────────────────────────────────────────
-function TasksTab({ tasks, setTasks, memory, recaps, filterOwner }) {
+function TasksTab({ tasks, setTasks, memory, dna, recaps, filterOwner }) {
   const [tab, setTab]               = useState("nu");
   const [filterCat, setFilterCat]   = useState(null);
   const [adding, setAdding]         = useState(false);
@@ -473,12 +629,12 @@ function TasksTab({ tasks, setTasks, memory, recaps, filterOwner }) {
   const [newOwner, setNewOwner]     = useState("samen");
   const [newDeadline, setNewDeadline] = useState("");
   const [detailId, setDetailId]     = useState(null);
+  const [detailView, setDetailView] = useState("info"); // "info" | "chat"
   const [draftNotes, setDraftNotes] = useState("");
   const [editNotes, setEditNotes]   = useState(false);
-  const [aiLoading, setAiLoading]   = useState(false);
   const [chatOpen, setChatOpen]     = useState(false);
-  const [chatMsgs, setChatMsgs]     = useState([]);           // v6: leeg — proactief gevuld
-  const [greetingDone, setGreetingDone] = useState(false);   // v6: voorkom dubbele greeting
+  const [chatMsgs, setChatMsgs]     = useState([]);
+  const [greetingDone, setGreetingDone] = useState(false);
   const [chatInput, setChatInput]   = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
@@ -498,30 +654,31 @@ function TasksTab({ tasks, setTasks, memory, recaps, filterOwner }) {
   );
   const todo = visible.filter(t => !t.done);
   const done = visible.filter(t => t.done);
-
   const countFor = (lid) => tasks.filter(t => t.list === lid && !t.done).length;
 
-  const toggleTask     = (id) => setTasks(prev => prev.map(t => t.id === id ? { ...t, done: !t.done } : t));
-  const removeTask     = (id) => { setTasks(prev => prev.filter(t => t.id !== id)); if (detailId === id) setDetailId(null); };
-  const cycleOwner     = (id) => setTasks(prev => prev.map(t => {
+  const toggleTask       = (id) => setTasks(prev => prev.map(t => t.id === id ? { ...t, done: !t.done } : t));
+  const removeTask       = (id) => { setTasks(prev => prev.filter(t => t.id !== id)); if (detailId === id) setDetailId(null); };
+  const cycleOwner       = (id) => setTasks(prev => prev.map(t => {
     if (t.id !== id) return t;
     const idx = OWNERS.findIndex(o => o.id === (t.owner || "samen"));
     return { ...t, owner: OWNERS[(idx + 1) % OWNERS.length].id };
   }));
   const updateMilestones = (id, ms) => setTasks(prev => prev.map(t => t.id === id ? { ...t, milestones: ms } : t));
+  const updateBronnen    = (id, br) => setTasks(prev => prev.map(t => t.id === id ? { ...t, bronnen: br } : t));
+  const updateTask       = (id, patch) => setTasks(prev => prev.map(t => t.id === id ? { ...t, ...patch } : t));
   const saveNotes        = () => { setTasks(prev => prev.map(t => t.id === detailId ? { ...t, notes: draftNotes } : t)); setEditNotes(false); };
-  const openDetail       = (task) => { setDetailId(task.id); setDraftNotes(task.notes || ""); setEditNotes(false); };
+  const openDetail       = (task) => { setDetailId(task.id); setDraftNotes(task.notes || ""); setEditNotes(false); setDetailView("info"); };
 
   const addTask = () => {
     if (!newText.trim()) return;
-    setTasks(prev => [...prev, { id: nextId++, text: newText.trim(), done: false, list: newList, cat: newCat, owner: newOwner, notes: newNotes.trim(), deadline: newDeadline || null, milestones: [], aiContent: null }]);
+    setTasks(prev => [...prev, { id: nextId++, text: newText.trim(), done: false, list: newList, cat: newCat, owner: newOwner, notes: newNotes.trim(), deadline: newDeadline || null, milestones: [], bronnen: [], cardChat: [] }]);
     setNewText(""); setNewNotes(""); setNewDeadline(""); setAdding(false);
   };
 
   const applyActions = (actions, prev) => {
     let updated = [...prev];
     for (const a of actions) {
-      if (a.type === "add")          updated.push({ id: nextId++, text: a.text, done: false, list: a.list || "nu", cat: a.cat || "overig", owner: a.owner || "samen", notes: a.notes || "", deadline: a.deadline || null, milestones: [], aiContent: null });
+      if (a.type === "add")          updated.push({ id: nextId++, text: a.text, done: false, list: a.list || "nu", cat: a.cat || "overig", owner: a.owner || "samen", notes: a.notes || "", deadline: null, milestones: [], bronnen: [], cardChat: [] });
       else if (a.type === "done")         updated = updated.map(t => t.id === a.id ? { ...t, done: true }  : t);
       else if (a.type === "undone")       updated = updated.map(t => t.id === a.id ? { ...t, done: false } : t);
       else if (a.type === "delete")       updated = updated.filter(t => t.id !== a.id);
@@ -551,12 +708,11 @@ function TasksTab({ tasks, setTasks, memory, recaps, filterOwner }) {
       setChatMsgs(prev => [...prev, { role: "assistant", content: text }]);
     } catch (err) {
       setApiError(err.message);
-      setChatMsgs(prev => [...prev, { role: "assistant", content: "Sorry, er ging iets mis. Probeer opnieuw." }]);
+      setChatMsgs(prev => [...prev, { role: "assistant", content: "Sorry, er ging iets mis." }]);
     }
     setChatLoading(false);
   };
 
-  // v6: Open chat met proactieve begroeting
   const openChat = async () => {
     setChatOpen(true);
     if (!greetingDone) {
@@ -566,32 +722,17 @@ function TasksTab({ tasks, setTasks, memory, recaps, filterOwner }) {
         const greeting = await generateProactiveGreeting(tasks, memory, recaps);
         setChatMsgs([{ role: "assistant", content: greeting }]);
       } catch {
-        setChatMsgs([{ role: "assistant", content: "Hoi! 👋 Ik ben TIPO — wat kan ik voor jullie doen?" }]);
+        setChatMsgs([{ role: "assistant", content: "Hoi! 👋 Wat kan ik voor jullie doen?" }]);
       }
       setChatLoading(false);
     }
   };
 
-  const handlePrepare = async (task) => {
-    setAiLoading(true);
-    setApiError(null);
-    try {
-      const content = await prepareTask(task);
-      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, aiContent: content } : t));
-    } catch (err) { setApiError(err.message); }
-    setAiLoading(false);
-  };
-
   const startListening = () => {
-    if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
-      setApiError("Spraak niet ondersteund in deze browser");
-      return;
-    }
+    if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) return;
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SR();
     recognition.lang = "nl-NL";
-    recognition.continuous = false;
-    recognition.interimResults = false;
     recognition.onresult  = (e) => { setChatInput(e.results[0][0].transcript); setIsListening(false); };
     recognition.onerror   = () => setIsListening(false);
     recognition.onend     = () => setIsListening(false);
@@ -603,22 +744,15 @@ function TasksTab({ tasks, setTasks, memory, recaps, filterOwner }) {
   const TaskRow = ({ task, faded = false }) => {
     const cat = getCat(task.cat);
     const pct = progress(task.milestones);
-
     const deadlineColor = (() => {
       if (!task.deadline || faded) return null;
       const days = Math.ceil((new Date(task.deadline) - new Date()) / 86400000);
-      if (days < 0)  return C.red;
-      if (days <= 3) return "#B05A00";
-      if (days <= 7) return "#8B5E1A";
-      return C.muted;
+      if (days < 0) return C.red; if (days <= 3) return "#B05A00"; if (days <= 7) return "#8B5E1A"; return C.muted;
     })();
     const deadlineLabel = (() => {
       if (!task.deadline || faded) return null;
       const days = Math.ceil((new Date(task.deadline) - new Date()) / 86400000);
-      if (days < 0)   return `${Math.abs(days)}d te laat`;
-      if (days === 0) return "Vandaag!";
-      if (days === 1) return "Morgen";
-      return `${days}d`;
+      if (days < 0) return `${Math.abs(days)}d te laat`; if (days === 0) return "Vandaag!"; if (days === 1) return "Morgen"; return `${days}d`;
     })();
 
     return (
@@ -632,19 +766,14 @@ function TasksTab({ tasks, setTasks, memory, recaps, filterOwner }) {
             display: "flex", alignItems: "center", justifyContent: "center",
           }}>{faded ? "✓" : ""}</button>
           <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => openDetail(task)}>
-            <div style={{ fontSize: 15, color: faded ? C.muted : C.dark, lineHeight: 1.45, textDecoration: faded ? "line-through" : "none", fontFamily: "'Georgia', serif" }}>
-              {task.text}
-            </div>
+            <div style={{ fontSize: 15, color: faded ? C.muted : C.dark, lineHeight: 1.45, textDecoration: faded ? "line-through" : "none", fontFamily: "'Georgia', serif" }}>{task.text}</div>
             <div style={{ marginTop: 5, display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
               <span style={{ fontSize: 11, color: C.muted }}>{cat.emoji} {cat.label}</span>
               {task.notes    && <span style={{ fontSize: 10, color: C.sandDark }}>· 📝</span>}
-              {task.aiContent && <span style={{ fontSize: 10, color: C.gold }}>· ✦</span>}
+              {task.bronnen?.length > 0 && <span style={{ fontSize: 10, color: C.sandDark }}>· 🔗{task.bronnen.length}</span>}
+              {task.cardChat?.length > 0 && <span style={{ fontSize: 10, color: C.gold }}>· ✦{task.cardChat.filter(m => m.role === "assistant").length}</span>}
               {pct !== null  && <span style={{ fontSize: 10, color: pct === 100 ? currentList.color : C.sandDark }}>· {pct}%</span>}
-              {deadlineLabel && (
-                <span style={{ fontSize: 10, color: deadlineColor, background: `${deadlineColor}18`, padding: "1px 7px", borderRadius: 8, fontWeight: 600 }}>
-                  ⏱ {deadlineLabel}
-                </span>
-              )}
+              {deadlineLabel && <span style={{ fontSize: 10, color: deadlineColor, background: `${deadlineColor}18`, padding: "1px 7px", borderRadius: 8, fontWeight: 600 }}>⏱ {deadlineLabel}</span>}
             </div>
             {pct !== null && !faded && <ProgressBar milestones={task.milestones} color={currentList.color} />}
           </div>
@@ -665,17 +794,14 @@ function TasksTab({ tasks, setTasks, memory, recaps, filterOwner }) {
       )}
 
       {/* List tabs */}
-      <div style={{ display: "flex", background: C.dark, padding: "0 20px", gap: 4, flexShrink: 0 }}>
+      <div style={{ display: "flex", background: C.dark, padding: "0 20px", flexShrink: 0 }}>
         {LISTS.map(list => {
-          const count  = countFor(list.id);
-          const active = tab === list.id;
+          const count = countFor(list.id); const active = tab === list.id;
           return (
             <button key={list.id} onClick={() => { setTab(list.id); setFilterCat(null); }} style={{
               flex: 1, padding: "10px 4px 12px", border: "none", background: "none", cursor: "pointer",
-              color: active ? list.color : "#AAA",
-              borderBottom: active ? `2.5px solid ${list.color}` : "2.5px solid transparent",
-              display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
-              fontFamily: "'Georgia', serif",
+              color: active ? list.color : "#AAA", borderBottom: active ? `2.5px solid ${list.color}` : "2.5px solid transparent",
+              display: "flex", flexDirection: "column", alignItems: "center", gap: 2, fontFamily: "'Georgia', serif",
             }}>
               <span style={{ fontSize: 15 }}>{list.emoji}</span>
               <span style={{ fontSize: 11, fontWeight: active ? 700 : 400 }}>{list.label}</span>
@@ -688,8 +814,8 @@ function TasksTab({ tasks, setTasks, memory, recaps, filterOwner }) {
       {/* Cat filters */}
       <div style={{ display: "flex", gap: 5, padding: "10px 16px", overflowX: "auto", background: C.sand, borderBottom: `1px solid ${C.sandDark}`, scrollbarWidth: "none", flexShrink: 0 }}>
         {[{ id: null, label: "Alles", emoji: "" }, ...CATEGORIES].map(cat => {
-          const isAll  = cat.id === null;
-          const count  = isAll ? null : tasks.filter(t => t.list === tab && t.cat === cat.id && !t.done).length;
+          const isAll = cat.id === null;
+          const count = isAll ? null : tasks.filter(t => t.list === tab && t.cat === cat.id && !t.done).length;
           if (!isAll && count === 0 && filterCat !== cat.id) return null;
           const active = isAll ? !filterCat : filterCat === cat.id;
           return (
@@ -726,13 +852,11 @@ function TasksTab({ tasks, setTasks, memory, recaps, filterOwner }) {
       <div style={{ padding: "10px 20px 24px", borderTop: `1px solid ${C.sand}`, background: C.bg, flexShrink: 0 }}>
         {adding ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <input autoFocus value={newText} onChange={e => setNewText(e.target.value)}
-              onKeyDown={e => e.key === "Escape" && setAdding(false)}
-              placeholder="Wat moet er gebeuren?"
+            <input autoFocus value={newText} onChange={e => setNewText(e.target.value)} onKeyDown={e => e.key === "Escape" && setAdding(false)} placeholder="Wat moet er gebeuren?"
               style={{ padding: "12px 14px", borderRadius: 12, border: `1.5px solid ${currentList.color}`, fontSize: 15, fontFamily: "'Georgia', serif", background: C.paper, outline: "none", color: C.dark }}
             />
             <textarea value={newNotes} onChange={e => setNewNotes(e.target.value)} placeholder="Notities (optioneel)..." rows={2}
-              style={{ padding: "10px 14px", borderRadius: 12, border: `1px solid ${C.sand}`, fontSize: 13, fontFamily: "'Georgia', serif", background: C.paper, outline: "none", color: C.brown, resize: "none", lineHeight: 1.5 }}
+              style={{ padding: "10px 14px", borderRadius: 12, border: `1px solid ${C.sand}`, fontSize: 13, fontFamily: "'Georgia', serif", background: C.paper, outline: "none", color: C.brown, resize: "none" }}
             />
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span style={{ fontSize: 12, color: C.muted, flexShrink: 0 }}>⏱ Deadline</span>
@@ -744,42 +868,23 @@ function TasksTab({ tasks, setTasks, memory, recaps, filterOwner }) {
             <OwnerPicker value={newOwner} onChange={setNewOwner} />
             <div style={{ display: "flex", gap: 6, overflowX: "auto", scrollbarWidth: "none" }}>
               {CATEGORIES.map(cat => (
-                <button key={cat.id} onClick={() => setNewCat(cat.id)} style={{
-                  padding: "6px 10px", borderRadius: 9, border: "none",
-                  background: newCat === cat.id ? C.dark : C.sand,
-                  color: newCat === cat.id ? C.gold : C.brown,
-                  fontSize: 15, cursor: "pointer", flexShrink: 0,
-                }}>{cat.emoji}</button>
+                <button key={cat.id} onClick={() => setNewCat(cat.id)} style={{ padding: "6px 10px", borderRadius: 9, border: "none", background: newCat === cat.id ? C.dark : C.sand, color: newCat === cat.id ? C.gold : C.brown, fontSize: 15, cursor: "pointer", flexShrink: 0 }}>{cat.emoji}</button>
               ))}
             </div>
             <div style={{ display: "flex", gap: 6 }}>
               {LISTS.map(list => (
-                <button key={list.id} onClick={() => setNewList(list.id)} style={{
-                  flex: 1, padding: "7px 4px", borderRadius: 10, border: "none",
-                  background: newList === list.id ? list.color : C.sand,
-                  color: newList === list.id ? "white" : C.brown,
-                  fontSize: 11, cursor: "pointer", fontFamily: "'Georgia', serif",
-                }}>{list.emoji} {list.label}</button>
+                <button key={list.id} onClick={() => setNewList(list.id)} style={{ flex: 1, padding: "7px 4px", borderRadius: 10, border: "none", background: newList === list.id ? list.color : C.sand, color: newList === list.id ? "white" : C.brown, fontSize: 11, cursor: "pointer", fontFamily: "'Georgia', serif" }}>{list.emoji} {list.label}</button>
               ))}
             </div>
             <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={() => { setAdding(false); setNewText(""); setNewNotes(""); }} style={{
-                flex: 1, padding: "11px", borderRadius: 12, border: `1px solid ${C.sand}`,
-                background: "none", color: C.muted, fontSize: 14, cursor: "pointer", fontFamily: "'Georgia', serif",
-              }}>Annuleer</button>
-              <button onClick={addTask} style={{
-                flex: 2, padding: "11px", borderRadius: 12, border: "none",
-                background: currentList.color, color: "white", fontSize: 14, cursor: "pointer",
-                fontFamily: "'Georgia', serif", fontWeight: 700,
-              }}>Voeg toe</button>
+              <button onClick={() => { setAdding(false); setNewText(""); setNewNotes(""); }} style={{ flex: 1, padding: "11px", borderRadius: 12, border: `1px solid ${C.sand}`, background: "none", color: C.muted, fontSize: 14, cursor: "pointer", fontFamily: "'Georgia', serif" }}>Annuleer</button>
+              <button onClick={addTask} style={{ flex: 2, padding: "11px", borderRadius: 12, border: "none", background: currentList.color, color: "white", fontSize: 14, cursor: "pointer", fontFamily: "'Georgia', serif", fontWeight: 700 }}>Voeg toe</button>
             </div>
           </div>
         ) : (
           <button onClick={() => { setAdding(true); setNewList(tab); }} style={{
-            width: "100%", padding: "13px", borderRadius: 12,
-            border: `1.5px dashed ${currentList.color}`, background: currentList.light, color: currentList.color,
-            fontSize: 15, cursor: "pointer", fontFamily: "'Georgia', serif",
-            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+            width: "100%", padding: "13px", borderRadius: 12, border: `1.5px dashed ${currentList.color}`, background: currentList.light, color: currentList.color,
+            fontSize: 15, cursor: "pointer", fontFamily: "'Georgia', serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
           }}><span style={{ fontSize: 20 }}>+</span> Nieuwe taak</button>
         )}
       </div>
@@ -794,120 +899,130 @@ function TasksTab({ tasks, setTasks, memory, recaps, filterOwner }) {
             <div onClick={() => { saveNotes(); setDetailId(null); }} style={{ position: "fixed", inset: 0, background: "rgba(30,26,20,0.55)", zIndex: 10 }} />
             <div style={{
               position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)",
-              width: "100%", maxWidth: 480, background: C.paper,
-              borderRadius: "22px 22px 0 0", padding: "20px 22px 38px", zIndex: 11,
-              boxShadow: "0 -12px 48px rgba(0,0,0,0.25)", maxHeight: "88vh", overflowY: "auto",
+              width: "100%", maxWidth: 480,
+              background: detailView === "chat" ? C.dark : C.paper,
+              borderRadius: "22px 22px 0 0", zIndex: 11,
+              boxShadow: "0 -12px 48px rgba(0,0,0,0.25)", maxHeight: "90vh",
+              display: "flex", flexDirection: "column",
             }}>
-              <div style={{ width: 40, height: 4, borderRadius: 2, background: C.sand, margin: "0 auto 18px" }} />
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 16 }}>
-                <button onClick={() => { toggleTask(detailItem.id); setDetailId(null); }} style={{
-                  width: 26, height: 26, borderRadius: "50%", flexShrink: 0, marginTop: 2,
-                  border: detailItem.done ? "none" : `2px solid ${list.color}`,
-                  background: detailItem.done ? list.color : "transparent",
-                  cursor: "pointer", color: "white", fontSize: 13,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}>{detailItem.done ? "✓" : ""}</button>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 16, color: detailItem.done ? C.muted : C.dark, lineHeight: 1.4, textDecoration: detailItem.done ? "line-through" : "none", fontFamily: "'Georgia', serif" }}>
-                    {detailItem.text}
+              <div style={{ width: 40, height: 4, borderRadius: 2, background: detailView === "chat" ? "#333" : C.sand, margin: "16px auto 0" }} />
+
+              {/* Detail header */}
+              <div style={{ padding: "12px 20px 0", flexShrink: 0 }}>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 12 }}>
+                  <button onClick={() => { toggleTask(detailItem.id); setDetailId(null); }} style={{
+                    width: 26, height: 26, borderRadius: "50%", flexShrink: 0, marginTop: 2,
+                    border: detailItem.done ? "none" : `2px solid ${list.color}`,
+                    background: detailItem.done ? list.color : "transparent",
+                    cursor: "pointer", color: "white", fontSize: 13,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>{detailItem.done ? "✓" : ""}</button>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 15, color: detailView === "chat" ? "#E8E0D0" : (detailItem.done ? C.muted : C.dark), lineHeight: 1.4, textDecoration: detailItem.done ? "line-through" : "none", fontFamily: "'Georgia', serif" }}>
+                      {detailItem.text}
+                    </div>
+                    <div style={{ marginTop: 6, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 11, padding: "3px 9px", borderRadius: 10, background: list.light, color: list.color }}>{list.emoji} {list.label}</span>
+                      <span style={{ fontSize: 11, padding: "3px 9px", borderRadius: 10, background: C.sand, color: C.brown }}>{cat.emoji} {cat.label}</span>
+                      <span onClick={() => cycleOwner(detailItem.id)} style={{ fontSize: 11, padding: "3px 9px", borderRadius: 10, background: owner.bg, color: owner.color, cursor: "pointer" }}>
+                        {owner.avatar} {owner.label}
+                      </span>
+                    </div>
                   </div>
-                  <div style={{ marginTop: 8, display: "flex", gap: 6, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 11, padding: "3px 9px", borderRadius: 10, background: list.light, color: list.color }}>{list.emoji} {list.label}</span>
-                    <span style={{ fontSize: 11, padding: "3px 9px", borderRadius: 10, background: C.sand, color: C.brown }}>{cat.emoji} {cat.label}</span>
-                    <span onClick={() => cycleOwner(detailItem.id)} style={{ fontSize: 11, padding: "3px 9px", borderRadius: 10, background: owner.bg, color: owner.color, cursor: "pointer" }}>
-                      {owner.avatar} {owner.label}
-                    </span>
-                  </div>
+                </div>
+
+                {/* Tab switcher: Info / TIPO */}
+                <div style={{ display: "flex", gap: 0, borderBottom: `1px solid ${detailView === "chat" ? "#2A2520" : C.sand}`, marginBottom: 0 }}>
+                  <button onClick={() => setDetailView("info")} style={{
+                    flex: 1, padding: "8px 4px 10px", border: "none", background: "none", cursor: "pointer",
+                    color: detailView === "info" ? list.color : C.muted,
+                    borderBottom: detailView === "info" ? `2px solid ${list.color}` : "2px solid transparent",
+                    fontSize: 12, fontFamily: "'Georgia', serif",
+                  }}>📋 Info & Mijlpalen</button>
+                  <button onClick={() => setDetailView("chat")} style={{
+                    flex: 1, padding: "8px 4px 10px", border: "none", background: "none", cursor: "pointer",
+                    color: detailView === "chat" ? C.gold : C.muted,
+                    borderBottom: detailView === "chat" ? `2px solid ${C.gold}` : "2px solid transparent",
+                    fontSize: 12, fontFamily: "'Georgia', serif",
+                  }}>✦ TIPO Assistent {detailItem.cardChat?.length > 0 ? `(${detailItem.cardChat.filter(m => m.role === "assistant").length})` : ""}</button>
                 </div>
               </div>
 
-              {/* Notes */}
-              <div style={{ background: C.sand, borderRadius: 14, padding: "13px 15px", marginBottom: 10 }}>
-                <div style={{ fontSize: 9, letterSpacing: 2, color: C.muted, textTransform: "uppercase", marginBottom: 8 }}>📝 Notities</div>
-                {editNotes ? (
-                  <textarea autoFocus value={draftNotes} onChange={e => setDraftNotes(e.target.value)} rows={3}
-                    style={{ width: "100%", border: "none", background: "transparent", fontSize: 14, fontFamily: "'Georgia', serif", color: C.dark, outline: "none", resize: "none", lineHeight: 1.6, boxSizing: "border-box" }}
-                  />
-                ) : (
-                  <div onClick={() => setEditNotes(true)} style={{ fontSize: 14, color: draftNotes ? C.dark : C.sandDark, lineHeight: 1.6, cursor: "text", minHeight: 38, fontFamily: "'Georgia', serif" }}>
-                    {draftNotes || "Tik om notities toe te voegen..."}
+              {/* Info view */}
+              {detailView === "info" && (
+                <div style={{ flex: 1, overflowY: "auto", padding: "14px 20px 30px" }}>
+                  {/* Notes */}
+                  <div style={{ background: C.sand, borderRadius: 14, padding: "13px 15px", marginBottom: 10 }}>
+                    <div style={{ fontSize: 9, letterSpacing: 2, color: C.muted, textTransform: "uppercase", marginBottom: 8 }}>📝 Notities</div>
+                    {editNotes ? (
+                      <textarea autoFocus value={draftNotes} onChange={e => setDraftNotes(e.target.value)} rows={3}
+                        style={{ width: "100%", border: "none", background: "transparent", fontSize: 14, fontFamily: "'Georgia', serif", color: C.dark, outline: "none", resize: "none", lineHeight: 1.6, boxSizing: "border-box" }}
+                      />
+                    ) : (
+                      <div onClick={() => setEditNotes(true)} style={{ fontSize: 14, color: draftNotes ? C.dark : C.sandDark, lineHeight: 1.6, cursor: "text", minHeight: 38, fontFamily: "'Georgia', serif" }}>
+                        {draftNotes || "Tik om notities toe te voegen..."}
+                      </div>
+                    )}
+                    {editNotes && <button onClick={saveNotes} style={{ marginTop: 8, padding: "7px 16px", borderRadius: 9, border: "none", background: list.color, color: "white", fontSize: 13, cursor: "pointer" }}>Opslaan</button>}
                   </div>
-                )}
-                {editNotes && <button onClick={saveNotes} style={{ marginTop: 8, padding: "7px 16px", borderRadius: 9, border: "none", background: list.color, color: "white", fontSize: 13, cursor: "pointer" }}>Opslaan</button>}
-              </div>
 
-              {/* Deadline */}
-              <div style={{ background: C.sand, borderRadius: 14, padding: "13px 15px", marginBottom: 10 }}>
-                <div style={{ fontSize: 9, letterSpacing: 2, color: C.muted, textTransform: "uppercase", marginBottom: 10 }}>⏱ Deadline</div>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <input type="date" value={detailItem.deadline || ""}
-                    onChange={e => setTasks(prev => prev.map(t => t.id === detailItem.id ? { ...t, deadline: e.target.value || null } : t))}
-                    style={{ flex: 1, padding: "8px 12px", borderRadius: 10, border: `1px solid ${C.sandDark}`, fontSize: 13, fontFamily: "'Georgia', serif", background: C.paper, outline: "none", color: detailItem.deadline ? C.dark : C.muted }}
-                  />
-                  {detailItem.deadline && (() => {
-                    const days = Math.ceil((new Date(detailItem.deadline) - new Date()) / 86400000);
-                    const color = days < 0 ? C.red : days <= 3 ? "#B05A00" : days <= 7 ? "#8B5E1A" : C.green;
-                    const label = days < 0 ? `${Math.abs(days)} dagen te laat` : days === 0 ? "Vandaag!" : days === 1 ? "Morgen" : `Nog ${days} dagen`;
-                    return <span style={{ fontSize: 12, color, fontWeight: 600 }}>{label}</span>;
-                  })()}
-                  {detailItem.deadline && (
-                    <button onClick={() => setTasks(prev => prev.map(t => t.id === detailItem.id ? { ...t, deadline: null } : t))}
-                      style={{ background: "none", border: "none", color: C.sandDark, cursor: "pointer", fontSize: 18 }}>×</button>
-                  )}
+                  {/* Deadline */}
+                  <div style={{ background: C.sand, borderRadius: 14, padding: "13px 15px", marginBottom: 10 }}>
+                    <div style={{ fontSize: 9, letterSpacing: 2, color: C.muted, textTransform: "uppercase", marginBottom: 10 }}>⏱ Deadline</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <input type="date" value={detailItem.deadline || ""}
+                        onChange={e => setTasks(prev => prev.map(t => t.id === detailItem.id ? { ...t, deadline: e.target.value || null } : t))}
+                        style={{ flex: 1, padding: "8px 12px", borderRadius: 10, border: `1px solid ${C.sandDark}`, fontSize: 13, fontFamily: "'Georgia', serif", background: C.paper, outline: "none", color: detailItem.deadline ? C.dark : C.muted }}
+                      />
+                      {detailItem.deadline && (() => {
+                        const days = Math.ceil((new Date(detailItem.deadline) - new Date()) / 86400000);
+                        const color = days < 0 ? C.red : days <= 3 ? "#B05A00" : days <= 7 ? "#8B5E1A" : C.green;
+                        const label = days < 0 ? `${Math.abs(days)} dagen te laat` : days === 0 ? "Vandaag!" : days === 1 ? "Morgen" : `Nog ${days} dagen`;
+                        return <span style={{ fontSize: 12, color, fontWeight: 600 }}>{label}</span>;
+                      })()}
+                      {detailItem.deadline && <button onClick={() => setTasks(prev => prev.map(t => t.id === detailItem.id ? { ...t, deadline: null } : t))} style={{ background: "none", border: "none", color: C.sandDark, cursor: "pointer", fontSize: 18 }}>×</button>}
+                    </div>
+                  </div>
+
+                  {/* Bronnen */}
+                  <div style={{ background: C.sand, borderRadius: 14, padding: "13px 15px", marginBottom: 10 }}>
+                    <div style={{ fontSize: 9, letterSpacing: 2, color: C.muted, textTransform: "uppercase", marginBottom: 10 }}>🔗 Bronnen</div>
+                    <BronnenEditor bronnen={detailItem.bronnen || []} onChange={br => updateBronnen(detailItem.id, br)} color={list.color} />
+                  </div>
+
+                  {/* Milestones */}
+                  <div style={{ background: C.sand, borderRadius: 14, padding: "13px 15px", marginBottom: 12 }}>
+                    <div style={{ fontSize: 9, letterSpacing: 2, color: C.muted, textTransform: "uppercase", marginBottom: 12 }}>🎯 Mijlpalen</div>
+                    {detailItem.milestones?.length > 0 && <div style={{ marginBottom: 12 }}><ProgressBar milestones={detailItem.milestones} color={list.color} /></div>}
+                    <MilestoneEditor milestones={detailItem.milestones || []} onChange={ms => updateMilestones(detailItem.id, ms)} color={list.color} />
+                  </div>
+
+                  <button onClick={() => removeTask(detailItem.id)} style={{ width: "100%", padding: "11px", borderRadius: 12, border: `1px solid ${C.sand}`, background: "none", color: C.sandDark, fontSize: 13, cursor: "pointer", fontFamily: "'Georgia', serif" }}>Verwijder taak</button>
                 </div>
-              </div>
+              )}
 
-              {/* AI preparation */}
-              <div style={{ background: C.dark, borderRadius: 14, padding: "13px 15px", marginBottom: 10 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: detailItem.aiContent || aiLoading ? 12 : 0 }}>
-                  <div style={{ fontSize: 9, letterSpacing: 2, color: C.gold, textTransform: "uppercase" }}>✦ TIPO Voorbereiding</div>
-                  <button onClick={() => handlePrepare(detailItem)} disabled={aiLoading} style={{
-                    padding: "6px 13px", borderRadius: 9, border: "none",
-                    background: aiLoading ? "#333" : C.gold, color: C.dark,
-                    fontSize: 11, cursor: aiLoading ? "default" : "pointer", fontFamily: "'Georgia', serif", fontWeight: 700,
-                  }}>{aiLoading ? "Laden..." : detailItem.aiContent ? "Ververs" : "Bereid voor"}</button>
-                </div>
-                {(detailItem.aiContent || aiLoading) && (
-                  <AIContent
-                    content={detailItem.aiContent}
-                    loading={aiLoading}
-                    color={C.gold}
-                    onAddMilestones={(suggestions) => {
-                      const newMs = suggestions.map(m => ({ id: `m${nextMid++}`, text: m.text, done: false, owner: m.owner || "samen" }));
-                      setTasks(prev => prev.map(t => t.id === detailItem.id ? { ...t, milestones: [...(t.milestones || []), ...newMs] } : t));
-                    }}
+              {/* Chat view */}
+              {detailView === "chat" && (
+                <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+                  <CardChat
+                    task={detailItem}
+                    onUpdateTask={(patch) => updateTask(detailItem.id, patch)}
+                    memory={memory}
+                    dna={dna}
+                    onClose={() => setDetailId(null)}
                   />
-                )}
-                {!detailItem.aiContent && !aiLoading && <div style={{ fontSize: 12, color: "#555", fontFamily: "'Georgia', serif" }}>Laat TIPO ideeën, bronnen en stappen genereren.</div>}
-              </div>
-
-              {/* Milestones */}
-              <div style={{ background: C.sand, borderRadius: 14, padding: "13px 15px", marginBottom: 12 }}>
-                <div style={{ fontSize: 9, letterSpacing: 2, color: C.muted, textTransform: "uppercase", marginBottom: 12 }}>🎯 Mijlpalen</div>
-                {detailItem.milestones?.length > 0 && <div style={{ marginBottom: 12 }}><ProgressBar milestones={detailItem.milestones} color={list.color} /></div>}
-                <MilestoneEditor milestones={detailItem.milestones || []} onChange={ms => updateMilestones(detailItem.id, ms)} color={list.color} />
-              </div>
-
-              <button onClick={() => removeTask(detailItem.id)} style={{
-                width: "100%", padding: "11px", borderRadius: 12, border: `1px solid ${C.sand}`,
-                background: "none", color: C.sandDark, fontSize: 13, cursor: "pointer", fontFamily: "'Georgia', serif",
-              }}>Verwijder taak</button>
+                </div>
+              )}
             </div>
           </>
         );
       })()}
 
-      {/* Chat panel */}
+      {/* Globale chat panel */}
       {chatOpen && (
         <>
           <div onClick={() => setChatOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(30,26,20,0.65)", zIndex: 20 }} />
-          <div style={{
-            position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)",
-            width: "100%", maxWidth: 480, background: C.dark,
-            borderRadius: "22px 22px 0 0", zIndex: 21,
-            display: "flex", flexDirection: "column", height: "74vh",
-            boxShadow: "0 -12px 48px rgba(0,0,0,0.45)",
-          }}>
+          <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 480, background: C.dark, borderRadius: "22px 22px 0 0", zIndex: 21, display: "flex", flexDirection: "column", height: "74vh", boxShadow: "0 -12px 48px rgba(0,0,0,0.45)" }}>
             <div style={{ padding: "16px 20px 12px", borderBottom: "1px solid #2A2520", flexShrink: 0 }}>
               <div style={{ width: 40, height: 4, borderRadius: 2, background: "#333", margin: "0 auto 14px" }} />
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -918,17 +1033,10 @@ function TasksTab({ tasks, setTasks, memory, recaps, filterOwner }) {
                 <button onClick={() => setChatOpen(false)} style={{ background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: 24 }}>×</button>
               </div>
             </div>
-
             <div style={{ flex: 1, overflowY: "auto", padding: "14px 18px", display: "flex", flexDirection: "column", gap: 10 }}>
               {chatMsgs.map((msg, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
-                  <div style={{
-                    maxWidth: "85%", padding: "10px 14px",
-                    borderRadius: msg.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
-                    background: msg.role === "user" ? C.gold : "#252218",
-                    color: msg.role === "user" ? C.dark : "#E8E0D0",
-                    fontSize: 14, lineHeight: 1.6, fontFamily: "'Georgia', serif",
-                  }}>{msg.content}</div>
+                  <div style={{ maxWidth: "85%", padding: "10px 14px", borderRadius: msg.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px", background: msg.role === "user" ? C.gold : "#252218", color: msg.role === "user" ? C.dark : "#E8E0D0", fontSize: 14, lineHeight: 1.6, fontFamily: "'Georgia', serif" }}>{msg.content}</div>
                 </div>
               ))}
               {chatLoading && (
@@ -938,41 +1046,19 @@ function TasksTab({ tasks, setTasks, memory, recaps, filterOwner }) {
               )}
               <div ref={chatEndRef} />
             </div>
-
             <div style={{ padding: "10px 16px 30px", borderTop: "1px solid #252218", flexShrink: 0, display: "flex", gap: 8, alignItems: "center" }}>
-              <button onClick={startListening} style={{
-                width: 44, height: 44, borderRadius: "50%", border: "none", flexShrink: 0,
-                background: isListening ? C.red : "#2A2520",
-                color: isListening ? "white" : C.gold, fontSize: 18, cursor: "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                animation: isListening ? "tipoFade 1s infinite" : "none",
-              }} title="Kippie — spreek je bericht in">🎙️</button>
-              <input value={chatInput} onChange={e => setChatInput(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && sendChat()}
-                placeholder={isListening ? "Luisteren..." : "Vraag TIPO iets..."}
+              <button onClick={startListening} style={{ width: 44, height: 44, borderRadius: "50%", border: "none", flexShrink: 0, background: isListening ? C.red : "#2A2520", color: isListening ? "white" : C.gold, fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>🎙️</button>
+              <input value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendChat()} placeholder="Vraag TIPO iets…"
                 style={{ flex: 1, padding: "11px 15px", borderRadius: 24, border: "1px solid #333", background: "#1A1710", color: "#E8E0D0", fontSize: 14, fontFamily: "'Georgia', serif", outline: "none" }}
               />
-              <button onClick={sendChat} disabled={chatLoading} style={{
-                width: 44, height: 44, borderRadius: "50%", border: "none", flexShrink: 0,
-                background: chatLoading ? "#333" : C.gold, color: C.dark,
-                cursor: chatLoading ? "default" : "pointer", fontSize: 18,
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>↑</button>
+              <button onClick={sendChat} disabled={chatLoading} style={{ width: 44, height: 44, borderRadius: "50%", border: "none", flexShrink: 0, background: chatLoading ? "#333" : C.gold, color: C.dark, cursor: chatLoading ? "default" : "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center" }}>↑</button>
             </div>
           </div>
         </>
       )}
 
-      {/* Floating chat button — v6: triggert proactieve greeting */}
       {!chatOpen && (
-        <button onClick={openChat} style={{
-          position: "fixed", bottom: 90, right: 20,
-          width: 52, height: 52, borderRadius: "50%",
-          background: C.dark, border: `2px solid ${C.gold}`,
-          color: C.gold, fontSize: 20, cursor: "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.3)", zIndex: 5,
-        }} title="TIPO openen">✦</button>
+        <button onClick={openChat} style={{ position: "fixed", bottom: 90, right: 20, width: 52, height: 52, borderRadius: "50%", background: C.dark, border: `2px solid ${C.gold}`, color: C.gold, fontSize: 20, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 20px rgba(0,0,0,0.3)", zIndex: 5 }} title="TIPO openen">✦</button>
       )}
     </div>
   );
@@ -992,44 +1078,29 @@ function RoutinesTab({ routines, setRoutines, filterOwner }) {
   const monthKey = getMonthKey();
   const key = period === "weekly" ? weekKey : monthKey;
 
-  const toggle = (id) => {
-    setRoutines(prev => ({
-      ...prev,
-      [period]: prev[period].map(r => {
-        if (r.id !== id) return r;
-        const comps = r.completions || {};
-        const done  = !comps[key];
-        return { ...r, completions: { ...comps, [key]: done || undefined }, streak: done ? (r.streak || 0) + 1 : Math.max(0, (r.streak || 0) - 1) };
-      }),
-    }));
-  };
+  const toggle = (id) => setRoutines(prev => ({ ...prev, [period]: prev[period].map(r => {
+    if (r.id !== id) return r;
+    const comps = r.completions || {};
+    const done = !comps[key];
+    return { ...r, completions: { ...comps, [key]: done || undefined }, streak: done ? (r.streak || 0) + 1 : Math.max(0, (r.streak || 0) - 1) };
+  })}));
 
-  const cycleOwner = (id) => {
-    setRoutines(prev => ({
-      ...prev,
-      [period]: prev[period].map(r => {
-        if (r.id !== id) return r;
-        const owners = OWNERS.filter(o => o.id !== "samen");
-        const idx    = owners.findIndex(o => o.id === r.owner);
-        return { ...r, owner: owners[(idx + 1) % owners.length].id };
-      }),
-    }));
-  };
+  const cycleOwner = (id) => setRoutines(prev => ({ ...prev, [period]: prev[period].map(r => {
+    if (r.id !== id) return r;
+    const owners = OWNERS.filter(o => o.id !== "samen");
+    const idx = owners.findIndex(o => o.id === r.owner);
+    return { ...r, owner: owners[(idx + 1) % owners.length].id };
+  })}));
 
   const addRoutine = () => {
     if (!newText.trim()) return;
-    const id = `${period[0]}${Date.now()}`;
-    setRoutines(prev => ({
-      ...prev,
-      [period]: [...prev[period], { id, text: newText.trim(), emoji: newEmoji, owner: newOwner, cat: newCat, streak: 0, completions: {} }],
-    }));
+    setRoutines(prev => ({ ...prev, [period]: [...prev[period], { id: `${period[0]}${Date.now()}`, text: newText.trim(), emoji: newEmoji, owner: newOwner, cat: newCat, streak: 0, completions: {} }] }));
     setNewText(""); setAdding(false);
   };
 
   const activeFilter = filterOwner || filter;
-  const visible      = routines[period].filter(r => !activeFilter || r.owner === activeFilter);
-  const cats         = ["leefstijl", "huishouden", "baby"].filter(c => visible.some(r => r.cat === c));
-
+  const visible = routines[period].filter(r => !activeFilter || r.owner === activeFilter);
+  const cats = ["leefstijl", "huishouden", "baby"].filter(c => visible.some(r => r.cat === c));
   const stats = OWNERS.filter(o => o.id !== "samen").map(o => {
     const mine = routines[period].filter(r => r.owner === o.id);
     const done = mine.filter(r => (r.completions || {})[key]).length;
@@ -1037,55 +1108,37 @@ function RoutinesTab({ routines, setRoutines, filterOwner }) {
     return { ...o, done, total: mine.length, pct, maxStreak: mine.length ? Math.max(...mine.map(r => r.streak || 0)) : 0 };
   });
   const leader = stats[0].pct >= stats[1].pct ? stats[0] : stats[1];
-
   const EMOJIS = ["🫀","💪","😴","🧘","🥗","💊","🩸","🛒","🏠","📋","💶","👶","✨","📖","🚶"];
 
   return (
     <div style={{ flex: 1, overflowY: "auto" }}>
       <div style={{ display: "flex", background: C.dark, padding: "0 20px" }}>
         {[{ id: "weekly", label: "Wekelijks", emoji: "🔥" }, { id: "monthly", label: "Maandelijks", emoji: "📅" }].map(p => (
-          <button key={p.id} onClick={() => setPeriod(p.id)} style={{
-            flex: 1, padding: "10px 4px 12px", border: "none", background: "none", cursor: "pointer",
-            color: period === p.id ? C.gold : "#AAA",
-            borderBottom: period === p.id ? `2.5px solid ${C.gold}` : "2.5px solid transparent",
-            fontSize: 12, fontFamily: "'Georgia', serif",
-          }}>{p.emoji} {p.label}</button>
+          <button key={p.id} onClick={() => setPeriod(p.id)} style={{ flex: 1, padding: "10px 4px 12px", border: "none", background: "none", cursor: "pointer", color: period === p.id ? C.gold : "#AAA", borderBottom: period === p.id ? `2.5px solid ${C.gold}` : "2.5px solid transparent", fontSize: 12, fontFamily: "'Georgia', serif" }}>{p.emoji} {p.label}</button>
         ))}
       </div>
-
       <div style={{ padding: "16px 18px 0" }}>
-        {/* Scorebord */}
         <div style={{ background: C.dark, borderRadius: 18, padding: "18px 20px", marginBottom: 18 }}>
           <div style={{ fontSize: 9, letterSpacing: 3, color: C.gold, textTransform: "uppercase", marginBottom: 14, opacity: 0.8 }}>Scorebord</div>
           <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
             {stats.map(s => (
               <div key={s.id} style={{ flex: 1, background: "rgba(255,255,255,0.04)", borderRadius: 14, padding: "13px 14px", border: s.id === leader.id && s.pct > 0 ? `1px solid ${C.gold}44` : "1px solid transparent" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                    <Avatar ownerId={s.id} size={24} />
-                    <span style={{ color: "#E0D8CC", fontSize: 13, fontFamily: "'Georgia', serif" }}>{s.label}</span>
-                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 7 }}><Avatar ownerId={s.id} size={24} /><span style={{ color: "#E0D8CC", fontSize: 13, fontFamily: "'Georgia', serif" }}>{s.label}</span></div>
                   {s.id === leader.id && s.pct > 0 && <span>👑</span>}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <div style={{ position: "relative", width: 48, height: 48, flexShrink: 0 }}>
                     <svg width="48" height="48" style={{ transform: "rotate(-90deg)" }}>
                       <circle cx="24" cy="24" r="20" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="4" />
-                      <circle cx="24" cy="24" r="20" fill="none" stroke={s.pct === 100 ? C.gold : s.color}
-                        strokeWidth="4" strokeLinecap="round"
-                        strokeDasharray={`${2 * Math.PI * 20}`}
-                        strokeDashoffset={`${2 * Math.PI * 20 * (1 - s.pct / 100)}`}
-                        style={{ transition: "stroke-dashoffset 0.5s ease" }}
-                      />
+                      <circle cx="24" cy="24" r="20" fill="none" stroke={s.pct === 100 ? C.gold : s.color} strokeWidth="4" strokeLinecap="round"
+                        strokeDasharray={`${2 * Math.PI * 20}`} strokeDashoffset={`${2 * Math.PI * 20 * (1 - s.pct / 100)}`} style={{ transition: "stroke-dashoffset 0.5s ease" }} />
                     </svg>
                     <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
                       <span style={{ fontSize: 10, fontWeight: 700, color: s.pct === 100 ? C.gold : "#E8E0D0", fontFamily: "monospace" }}>{s.pct}%</span>
                     </div>
                   </div>
-                  <div>
-                    <div style={{ color: "#888", fontSize: 11 }}>{s.done}/{s.total}</div>
-                    {s.maxStreak > 0 && <div style={{ color: C.gold, fontSize: 11, marginTop: 2 }}>🔥 {s.maxStreak}×</div>}
-                  </div>
+                  <div><div style={{ color: "#888", fontSize: 11 }}>{s.done}/{s.total}</div>{s.maxStreak > 0 && <div style={{ color: C.gold, fontSize: 11, marginTop: 2 }}>🔥 {s.maxStreak}×</div>}</div>
                 </div>
               </div>
             ))}
@@ -1096,33 +1149,20 @@ function RoutinesTab({ routines, setRoutines, filterOwner }) {
             const pct = tot ? Math.round(don / tot * 100) : 0;
             return (
               <div>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
-                  <span style={{ fontSize: 9, color: "#555", letterSpacing: 1 }}>GEZAMENLIJK</span>
-                  <span style={{ fontSize: 9, color: pct === 100 ? C.gold : "#555", fontFamily: "monospace" }}>{don}/{tot}</span>
-                </div>
-                <div style={{ height: 3, background: "rgba(255,255,255,0.08)", borderRadius: 2, overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${pct}%`, background: pct === 100 ? C.gold : `linear-gradient(90deg, ${C.sven}, ${C.eva})`, borderRadius: 2, transition: "width 0.5s" }} />
-                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}><span style={{ fontSize: 9, color: "#555", letterSpacing: 1 }}>GEZAMENLIJK</span><span style={{ fontSize: 9, color: pct === 100 ? C.gold : "#555", fontFamily: "monospace" }}>{don}/{tot}</span></div>
+                <div style={{ height: 3, background: "rgba(255,255,255,0.08)", borderRadius: 2, overflow: "hidden" }}><div style={{ height: "100%", width: `${pct}%`, background: pct === 100 ? C.gold : `linear-gradient(90deg, ${C.sven}, ${C.eva})`, borderRadius: 2, transition: "width 0.5s" }} /></div>
               </div>
             );
           })()}
         </div>
-
-        {/* Owner filter */}
         <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
           <button onClick={() => setFilter(null)} style={{ padding: "5px 12px", borderRadius: 14, border: "none", fontSize: 11, cursor: "pointer", background: !activeFilter ? C.dark : C.sand, color: !activeFilter ? C.gold : C.brown, fontFamily: "'Georgia', serif" }}>Iedereen</button>
           {OWNERS.filter(o => o.id !== "samen").map(o => (
-            <button key={o.id} onClick={() => setFilter(activeFilter === o.id ? null : o.id)} style={{
-              padding: "5px 12px", borderRadius: 14, border: `1px solid ${activeFilter === o.id ? o.color : C.sand}`,
-              background: activeFilter === o.id ? o.bg : C.paper, color: activeFilter === o.id ? o.color : C.muted,
-              fontSize: 11, cursor: "pointer", fontFamily: "'Georgia', serif",
-            }}>{o.avatar} {o.label}</button>
+            <button key={o.id} onClick={() => setFilter(activeFilter === o.id ? null : o.id)} style={{ padding: "5px 12px", borderRadius: 14, border: `1px solid ${activeFilter === o.id ? o.color : C.sand}`, background: activeFilter === o.id ? o.bg : C.paper, color: activeFilter === o.id ? o.color : C.muted, fontSize: 11, cursor: "pointer", fontFamily: "'Georgia', serif" }}>{o.avatar} {o.label}</button>
           ))}
         </div>
-
-        {/* Routines */}
         {cats.map(cat => {
-          const items   = visible.filter(r => r.cat === cat);
+          const items = visible.filter(r => r.cat === cat);
           if (!items.length) return null;
           const catInfo = ROUTINE_CATS.find(c => c.id === cat);
           return (
@@ -1131,63 +1171,36 @@ function RoutinesTab({ routines, setRoutines, filterOwner }) {
               {items.map(r => {
                 const done = !!(r.completions || {})[key];
                 return (
-                  <div key={r.id} style={{
-                    display: "flex", alignItems: "center", gap: 11,
-                    padding: "12px 14px", borderRadius: 14, marginBottom: 8,
-                    background: done ? `${C.sand}88` : C.paper,
-                    border: `1px solid ${done ? C.sandDark : C.sand}`,
-                  }}>
-                    <button onClick={() => toggle(r.id)} style={{
-                      width: 28, height: 28, borderRadius: "50%", flexShrink: 0,
-                      border: `2px solid ${done ? C.gold : C.sandDark}`,
-                      background: done ? C.gold : "transparent",
-                      cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                      color: "white", fontSize: 13, transition: "all 0.2s",
-                    }}>{done ? "✓" : ""}</button>
+                  <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 11, padding: "12px 14px", borderRadius: 14, marginBottom: 8, background: done ? `${C.sand}88` : C.paper, border: `1px solid ${done ? C.sandDark : C.sand}` }}>
+                    <button onClick={() => toggle(r.id)} style={{ width: 28, height: 28, borderRadius: "50%", flexShrink: 0, border: `2px solid ${done ? C.gold : C.sandDark}`, background: done ? C.gold : "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 13 }}>{done ? "✓" : ""}</button>
                     <span style={{ fontSize: 18, flexShrink: 0 }}>{r.emoji}</span>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 14, color: done ? C.muted : C.dark, textDecoration: done ? "line-through" : "none", fontFamily: "'Georgia', serif", lineHeight: 1.3 }}>{r.text}</div>
                       {(r.streak || 0) > 0 && <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>🔥 {r.streak}× op rij</div>}
                     </div>
-                    <div onClick={() => cycleOwner(r.id)} style={{ cursor: "pointer" }}>
-                      <Avatar ownerId={r.owner} size={26} />
-                    </div>
+                    <div onClick={() => cycleOwner(r.id)} style={{ cursor: "pointer" }}><Avatar ownerId={r.owner} size={26} /></div>
                   </div>
                 );
               })}
             </div>
           );
         })}
-
         {adding && (
           <div style={{ background: C.paper, borderRadius: 16, padding: 16, marginBottom: 14, border: `1.5px solid ${C.gold}` }}>
             <div style={{ fontSize: 9, letterSpacing: 2, color: C.gold, marginBottom: 12, textTransform: "uppercase" }}>Nieuwe routine</div>
-            <input value={newText} onChange={e => setNewText(e.target.value)} onKeyDown={e => e.key === "Enter" && addRoutine()}
-              placeholder="Omschrijving..." autoFocus
+            <input value={newText} onChange={e => setNewText(e.target.value)} onKeyDown={e => e.key === "Enter" && addRoutine()} placeholder="Omschrijving..." autoFocus
               style={{ width: "100%", padding: "9px 12px", borderRadius: 10, border: `1px solid ${C.sand}`, fontSize: 14, fontFamily: "'Georgia', serif", outline: "none", boxSizing: "border-box", marginBottom: 10, color: C.dark }}
             />
             <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 10 }}>
-              {EMOJIS.map(em => (
-                <button key={em} onClick={() => setNewEmoji(em)} style={{ width: 34, height: 34, borderRadius: 8, border: `1.5px solid ${newEmoji === em ? C.gold : C.sand}`, background: newEmoji === em ? `${C.gold}20` : C.paper, fontSize: 16, cursor: "pointer" }}>{em}</button>
-              ))}
+              {EMOJIS.map(em => <button key={em} onClick={() => setNewEmoji(em)} style={{ width: 34, height: 34, borderRadius: 8, border: `1.5px solid ${newEmoji === em ? C.gold : C.sand}`, background: newEmoji === em ? `${C.gold}20` : C.paper, fontSize: 16, cursor: "pointer" }}>{em}</button>)}
             </div>
             <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
               {OWNERS.filter(o => o.id !== "samen").map(o => (
-                <button key={o.id} onClick={() => setNewOwner(o.id)} style={{
-                  flex: 1, padding: "7px", borderRadius: 10, border: `1.5px solid ${newOwner === o.id ? o.color : C.sand}`,
-                  background: newOwner === o.id ? o.bg : C.paper, color: newOwner === o.id ? o.color : C.muted,
-                  fontSize: 13, cursor: "pointer", fontFamily: "'Georgia', serif",
-                }}>{o.avatar} {o.label}</button>
+                <button key={o.id} onClick={() => setNewOwner(o.id)} style={{ flex: 1, padding: "7px", borderRadius: 10, border: `1.5px solid ${newOwner === o.id ? o.color : C.sand}`, background: newOwner === o.id ? o.bg : C.paper, color: newOwner === o.id ? o.color : C.muted, fontSize: 13, cursor: "pointer", fontFamily: "'Georgia', serif" }}>{o.avatar} {o.label}</button>
               ))}
             </div>
             <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
-              {ROUTINE_CATS.map(c => (
-                <button key={c.id} onClick={() => setNewCat(c.id)} style={{
-                  flex: 1, padding: "6px", borderRadius: 10, border: "none",
-                  background: newCat === c.id ? C.dark : C.sand, color: newCat === c.id ? C.gold : C.brown,
-                  fontSize: 11, cursor: "pointer", fontFamily: "'Georgia', serif",
-                }}>{c.emoji} {c.label}</button>
-              ))}
+              {ROUTINE_CATS.map(c => <button key={c.id} onClick={() => setNewCat(c.id)} style={{ flex: 1, padding: "6px", borderRadius: 10, border: "none", background: newCat === c.id ? C.dark : C.sand, color: newCat === c.id ? C.gold : C.brown, fontSize: 11, cursor: "pointer", fontFamily: "'Georgia', serif" }}>{c.emoji} {c.label}</button>)}
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={() => setAdding(false)} style={{ flex: 1, padding: "9px", borderRadius: 10, border: `1px solid ${C.sand}`, background: "none", color: C.muted, fontSize: 13, cursor: "pointer" }}>Annuleer</button>
@@ -1195,15 +1208,7 @@ function RoutinesTab({ routines, setRoutines, filterOwner }) {
             </div>
           </div>
         )}
-
-        {!adding && (
-          <button onClick={() => setAdding(true)} style={{
-            width: "100%", padding: "13px", borderRadius: 12,
-            border: `1.5px dashed ${C.gold}`, background: `${C.gold}10`, color: C.gold,
-            fontSize: 14, cursor: "pointer", fontFamily: "'Georgia', serif",
-            display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 24,
-          }}>+ Routine toevoegen</button>
-        )}
+        {!adding && <button onClick={() => setAdding(true)} style={{ width: "100%", padding: "13px", borderRadius: 12, border: `1.5px dashed ${C.gold}`, background: `${C.gold}10`, color: C.gold, fontSize: 14, cursor: "pointer", fontFamily: "'Georgia', serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 24 }}>+ Routine toevoegen</button>}
       </div>
     </div>
   );
@@ -1211,17 +1216,17 @@ function RoutinesTab({ routines, setRoutines, filterOwner }) {
 
 // ─── RECAP TAB ────────────────────────────────────────────────────────────────
 function RecapTab({ tasks, recaps, setRecaps, setMemory }) {
-  const [view, setView]               = useState("overview");
-  const [svenDone, setSvenDone]       = useState(false);
-  const [evaDone, setEvaDone]         = useState(false);
-  const [svenAns, setSvenAns]         = useState(null);
-  const [evaAns, setEvaAns]           = useState(null);
-  const [insight, setInsight]         = useState(null);
+  const [view, setView]           = useState("overview");
+  const [svenDone, setSvenDone]   = useState(false);
+  const [evaDone, setEvaDone]     = useState(false);
+  const [svenAns, setSvenAns]     = useState(null);
+  const [evaAns, setEvaAns]       = useState(null);
+  const [insight, setInsight]     = useState(null);
   const [insightLoading, setInsightLoading] = useState(false);
-  const [showSettings, setShowSettings]   = useState(false);
-  const [reminderDay, setReminderDay]     = useState("zondag");
-  const [reminderTime, setReminderTime]   = useState("09:00");
-  const [showAlert, setShowAlert]         = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [reminderDay, setReminderDay]   = useState("zondag");
+  const [reminderTime, setReminderTime] = useState("09:00");
+  const [showAlert, setShowAlert] = useState(false);
 
   useEffect(() => {
     const today = new Date().toLocaleDateString("nl-NL", { weekday: "long" });
@@ -1246,30 +1251,27 @@ function RecapTab({ tasks, recaps, setRecaps, setMemory }) {
       const text = await generateRecapInsight(sa, ea, tasks);
       setInsight(text);
       const newRecap = { week: weekLabel, date: new Date().toISOString(), sven: sa, eva: ea, insight: text };
-      const updated  = [newRecap, ...recaps].slice(0, 12);
+      const updated = [newRecap, ...recaps].slice(0, 12);
       setRecaps(updated);
       const memSummary = `Recap ${weekLabel}: Sven energie ${sa.energy}/5 (${sa.highlight}), Eva energie ${ea.energy}/5 (${ea.highlight}). TIPO inzicht: ${text}`;
       setMemory(prev => (prev ? `${memSummary}\n\n${prev}` : memSummary).slice(0, 2000));
-    } catch (_) { setInsight("Kon geen inzicht genereren. Probeer later opnieuw."); }
+    } catch (_) { setInsight("Kon geen inzicht genereren."); }
     setInsightLoading(false);
   };
 
   const RecapForm = ({ owner, onDone }) => {
     const o = OWNERS.find(o2 => o2.id === owner);
     const [answers, setAnswers] = useState({ energy: 0 });
-    const [step, setStep]       = useState(0);
-    const q      = RECAP_QUESTIONS[step];
+    const [step, setStep] = useState(0);
+    const q = RECAP_QUESTIONS[step];
     const isLast = step === RECAP_QUESTIONS.length - 1;
     const canNext = q.type === "scale" ? answers.energy > 0 : (answers[q.id] || "").trim().length > 2;
-
     const next = () => { if (isLast) { onDone(answers); return; } setStep(s => s + 1); };
 
     return (
       <div style={{ background: C.paper, borderRadius: 18, padding: 20, border: `1px solid ${C.sand}` }}>
         <div style={{ display: "flex", gap: 4, marginBottom: 18 }}>
-          {RECAP_QUESTIONS.map((_, i) => (
-            <div key={i} style={{ flex: 1, height: 3, borderRadius: 2, background: i <= step ? o.color : C.sand, transition: "background 0.3s" }} />
-          ))}
+          {RECAP_QUESTIONS.map((_, i) => <div key={i} style={{ flex: 1, height: 3, borderRadius: 2, background: i <= step ? o.color : C.sand, transition: "background 0.3s" }} />)}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
           <span style={{ fontSize: 22 }}>{q.icon}</span>
@@ -1278,51 +1280,32 @@ function RecapTab({ tasks, recaps, setRecaps, setMemory }) {
         {q.type === "scale" ? (
           <div style={{ display: "flex", gap: 8 }}>
             {[1,2,3,4,5].map(n => (
-              <button key={n} onClick={() => setAnswers(a => ({ ...a, energy: n }))} style={{
-                flex: 1, padding: "12px 4px", borderRadius: 12,
-                border: `1.5px solid ${answers.energy >= n ? o.color : C.sand}`,
-                background: answers.energy >= n ? `${o.color}18` : C.paper,
-                fontSize: 22, cursor: "pointer", transition: "all 0.15s",
-              }}>{["😴","😐","🙂","😊","🔥"][n-1]}</button>
+              <button key={n} onClick={() => setAnswers(a => ({ ...a, energy: n }))} style={{ flex: 1, padding: "12px 4px", borderRadius: 12, border: `1.5px solid ${answers.energy >= n ? o.color : C.sand}`, background: answers.energy >= n ? `${o.color}18` : C.paper, fontSize: 22, cursor: "pointer" }}>
+                {["😴","😐","🙂","😊","🔥"][n-1]}
+              </button>
             ))}
           </div>
         ) : (
-          <textarea value={answers[q.id] || ""} onChange={e => setAnswers(a => ({ ...a, [q.id]: e.target.value }))}
-            placeholder={q.placeholder} rows={3} autoFocus
+          <textarea value={answers[q.id] || ""} onChange={e => setAnswers(a => ({ ...a, [q.id]: e.target.value }))} placeholder={q.placeholder} rows={3} autoFocus
             style={{ width: "100%", padding: "12px 14px", borderRadius: 12, border: `1.5px solid ${C.sand}`, fontSize: 14, fontFamily: "'Georgia', serif", color: C.dark, outline: "none", resize: "none", lineHeight: 1.6, background: "white", boxSizing: "border-box", marginTop: 8 }}
           />
         )}
-        <button onClick={next} disabled={!canNext} style={{
-          width: "100%", marginTop: 16, padding: "13px", borderRadius: 12, border: "none",
-          background: canNext ? o.color : C.sand, color: canNext ? "white" : C.muted,
-          fontSize: 14, cursor: canNext ? "pointer" : "default", fontFamily: "'Georgia', serif", fontWeight: 700,
-        }}>{isLast ? "Afronden ✓" : "Volgende →"}</button>
+        <button onClick={next} disabled={!canNext} style={{ width: "100%", marginTop: 16, padding: "13px", borderRadius: 12, border: "none", background: canNext ? o.color : C.sand, color: canNext ? "white" : C.muted, fontSize: 14, cursor: canNext ? "pointer" : "default", fontFamily: "'Georgia', serif", fontWeight: 700 }}>
+          {isLast ? "Afronden ✓" : "Volgende →"}
+        </button>
       </div>
     );
   };
 
   if (view === "recap-sven") return (
     <div style={{ flex: 1, overflowY: "auto", padding: "18px 18px 0" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-        <Avatar ownerId="sven" size={34} />
-        <div>
-          <div style={{ fontSize: 15, color: C.dark, fontFamily: "'Georgia', serif" }}>Sven's check-in</div>
-          <div style={{ fontSize: 11, color: C.muted }}>4 vragen · ~2 minuten</div>
-        </div>
-      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}><Avatar ownerId="sven" size={34} /><div><div style={{ fontSize: 15, color: C.dark, fontFamily: "'Georgia', serif" }}>Sven's check-in</div><div style={{ fontSize: 11, color: C.muted }}>4 vragen · ~2 minuten</div></div></div>
       <RecapForm owner="sven" onDone={a => { setSvenAns(a); setSvenDone(true); setView("overview"); }} />
     </div>
   );
-
   if (view === "recap-eva") return (
     <div style={{ flex: 1, overflowY: "auto", padding: "18px 18px 0" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-        <Avatar ownerId="eva" size={34} />
-        <div>
-          <div style={{ fontSize: 15, color: C.dark, fontFamily: "'Georgia', serif" }}>Eva's check-in</div>
-          <div style={{ fontSize: 11, color: C.muted }}>4 vragen · ~2 minuten</div>
-        </div>
-      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}><Avatar ownerId="eva" size={34} /><div><div style={{ fontSize: 15, color: C.dark, fontFamily: "'Georgia', serif" }}>Eva's check-in</div><div style={{ fontSize: 11, color: C.muted }}>4 vragen · ~2 minuten</div></div></div>
       <RecapForm owner="eva" onDone={a => { setEvaAns(a); setEvaDone(true); setView("overview"); }} />
     </div>
   );
@@ -1332,117 +1315,71 @@ function RecapTab({ tasks, recaps, setRecaps, setMemory }) {
       {showAlert && (
         <div style={{ background: C.gold, borderRadius: 14, padding: "13px 16px", marginBottom: 16, display: "flex", alignItems: "center", gap: 12 }}>
           <span style={{ fontSize: 22 }}>📊</span>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: C.dark, fontFamily: "'Georgia', serif" }}>Recap tijd!</div>
-            <div style={{ fontSize: 11, color: C.brown }}>Jullie wekelijkse check-in staat klaar — duurt ~2 minuten.</div>
-          </div>
+          <div style={{ flex: 1 }}><div style={{ fontSize: 13, fontWeight: 700, color: C.dark, fontFamily: "'Georgia', serif" }}>Recap tijd!</div><div style={{ fontSize: 11, color: C.brown }}>Jullie wekelijkse check-in staat klaar.</div></div>
           <button onClick={() => setShowAlert(false)} style={{ background: "none", border: "none", color: C.brown, cursor: "pointer", fontSize: 20 }}>×</button>
         </div>
       )}
-
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
-        <button onClick={() => setShowSettings(!showSettings)} style={{
-          padding: "7px 14px", borderRadius: 12, border: `1px solid ${C.sand}`,
-          background: showSettings ? C.dark : C.paper, color: showSettings ? C.gold : C.muted,
-          fontSize: 12, cursor: "pointer", fontFamily: "'Georgia', serif",
-          display: "flex", alignItems: "center", gap: 6,
-        }}>⚙️ Herinnering instellen</button>
+        <button onClick={() => setShowSettings(!showSettings)} style={{ padding: "7px 14px", borderRadius: 12, border: `1px solid ${C.sand}`, background: showSettings ? C.dark : C.paper, color: showSettings ? C.gold : C.muted, fontSize: 12, cursor: "pointer", fontFamily: "'Georgia', serif" }}>⚙️ Herinnering</button>
       </div>
-
       {showSettings && (
         <div style={{ background: C.paper, borderRadius: 18, padding: 18, marginBottom: 16, border: `1px solid ${C.sand}` }}>
           <div style={{ fontSize: 9, letterSpacing: 2, color: C.gold, textTransform: "uppercase", marginBottom: 14 }}>⚙️ Herinnering</div>
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 12, color: C.muted, marginBottom: 8 }}>Dag</div>
             <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-              {["ma","di","wo","do","vr","za","zo"].map((d, i) => {
-                const full = ["maandag","dinsdag","woensdag","donderdag","vrijdag","zaterdag","zondag"][i];
-                return <button key={d} onClick={() => setReminderDay(full)} style={{ padding: "6px 10px", borderRadius: 10, border: "none", background: reminderDay === full ? C.dark : C.sand, color: reminderDay === full ? C.gold : C.brown, fontSize: 11, cursor: "pointer" }}>{d}</button>;
-              })}
+              {["ma","di","wo","do","vr","za","zo"].map((d, i) => { const full = ["maandag","dinsdag","woensdag","donderdag","vrijdag","zaterdag","zondag"][i]; return <button key={d} onClick={() => setReminderDay(full)} style={{ padding: "6px 10px", borderRadius: 10, border: "none", background: reminderDay === full ? C.dark : C.sand, color: reminderDay === full ? C.gold : C.brown, fontSize: 11, cursor: "pointer" }}>{d}</button>; })}
             </div>
           </div>
           <div style={{ marginBottom: 14 }}>
             <div style={{ fontSize: 12, color: C.muted, marginBottom: 8 }}>Tijdstip</div>
             <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-              {["07:00","08:00","09:00","10:00","11:00","19:00","20:00"].map(t => (
-                <button key={t} onClick={() => setReminderTime(t)} style={{ padding: "6px 10px", borderRadius: 10, border: "none", background: reminderTime === t ? C.dark : C.sand, color: reminderTime === t ? C.gold : C.brown, fontSize: 12, cursor: "pointer", fontFamily: "monospace" }}>{t}</button>
-              ))}
+              {["07:00","08:00","09:00","10:00","19:00","20:00"].map(t => <button key={t} onClick={() => setReminderTime(t)} style={{ padding: "6px 10px", borderRadius: 10, border: "none", background: reminderTime === t ? C.dark : C.sand, color: reminderTime === t ? C.gold : C.brown, fontSize: 12, cursor: "pointer", fontFamily: "monospace" }}>{t}</button>)}
             </div>
           </div>
-          <div style={{ background: `${C.gold}18`, borderRadius: 12, padding: "10px 14px", marginBottom: 14, fontSize: 13, color: C.brown, fontFamily: "'Georgia', serif" }}>
-            📲 Elke <strong>{reminderDay}</strong> om <strong>{reminderTime}</strong>
-          </div>
+          <div style={{ background: `${C.gold}18`, borderRadius: 12, padding: "10px 14px", marginBottom: 14, fontSize: 13, color: C.brown, fontFamily: "'Georgia', serif" }}>📲 Elke <strong>{reminderDay}</strong> om <strong>{reminderTime}</strong></div>
           <button onClick={() => setShowSettings(false)} style={{ width: "100%", padding: "10px", borderRadius: 12, border: "none", background: C.gold, color: C.dark, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Opslaan</button>
         </div>
       )}
-
       <div style={{ marginBottom: 18 }}>
         <div style={{ fontSize: 9, letterSpacing: 2, color: C.muted, textTransform: "uppercase", marginBottom: 12 }}>{weekLabel} — invullen</div>
         <div style={{ display: "flex", gap: 10 }}>
-          {[
-            { owner: "sven", done: svenDone, action: () => setView("recap-sven") },
-            { owner: "eva",  done: evaDone,  action: () => setView("recap-eva") },
-          ].map(({ owner, done, action }) => {
+          {[{ owner: "sven", done: svenDone, action: () => setView("recap-sven") }, { owner: "eva", done: evaDone, action: () => setView("recap-eva") }].map(({ owner, done, action }) => {
             const o = OWNERS.find(o2 => o2.id === owner);
             return (
-              <button key={owner} onClick={action} style={{
-                flex: 1, padding: "18px 14px", borderRadius: 18, cursor: done ? "default" : "pointer",
-                border: `1.5px solid ${done ? o.color : C.sand}`,
-                background: done ? o.bg : C.paper,
-                display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
-              }}>
+              <button key={owner} onClick={action} style={{ flex: 1, padding: "18px 14px", borderRadius: 18, cursor: done ? "default" : "pointer", border: `1.5px solid ${done ? o.color : C.sand}`, background: done ? o.bg : C.paper, display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
                 <Avatar ownerId={owner} size={40} />
                 <div style={{ fontSize: 13, color: done ? o.color : C.dark, fontFamily: "'Georgia', serif" }}>{o.label}</div>
-                <div style={{ fontSize: 11, padding: "4px 12px", borderRadius: 20, background: done ? o.color : C.sand, color: done ? "white" : C.muted }}>
-                  {done ? "✓ Gedaan" : "Invullen →"}
-                </div>
+                <div style={{ fontSize: 11, padding: "4px 12px", borderRadius: 20, background: done ? o.color : C.sand, color: done ? "white" : C.muted }}>{done ? "✓ Gedaan" : "Invullen →"}</div>
               </button>
             );
           })}
         </div>
       </div>
-
       {svenDone && evaDone && (
         <div style={{ background: C.dark, borderRadius: 18, padding: "16px 18px", marginBottom: 18 }}>
           <div style={{ fontSize: 9, letterSpacing: 2, color: C.gold, textTransform: "uppercase", marginBottom: 10 }}>✦ TIPO Inzicht</div>
-          {!insight && !insightLoading && (
-            <button onClick={() => generateInsight(svenAns, evaAns)} style={{ width: "100%", padding: "11px", borderRadius: 12, border: "none", background: C.gold, color: C.dark, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Georgia', serif" }}>
-              Genereer inzicht
-            </button>
-          )}
-          {insightLoading && (
-            <div style={{ display: "flex", gap: 5, padding: "10px 0" }}>
-              {[0,1,2].map(i => <div key={i} style={{ width: 6, height: 6, borderRadius: "50%", background: C.gold, animation: `tipoFade 1.2s ${i*0.2}s infinite` }} />)}
-            </div>
-          )}
+          {!insight && !insightLoading && <button onClick={() => generateInsight(svenAns, evaAns)} style={{ width: "100%", padding: "11px", borderRadius: 12, border: "none", background: C.gold, color: C.dark, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Georgia', serif" }}>Genereer inzicht</button>}
+          {insightLoading && <div style={{ display: "flex", gap: 5, padding: "10px 0" }}>{[0,1,2].map(i => <div key={i} style={{ width: 6, height: 6, borderRadius: "50%", background: C.gold, animation: `tipoFade 1.2s ${i*0.2}s infinite` }} />)}</div>}
           {insight && <div style={{ fontSize: 13, color: "#E8E0D0", lineHeight: 1.75, fontFamily: "'Georgia', serif" }}>{insight}</div>}
         </div>
       )}
-
       {recaps.length > 0 && (
         <div style={{ marginBottom: 24 }}>
           <div style={{ fontSize: 9, letterSpacing: 2, color: C.muted, textTransform: "uppercase", marginBottom: 12 }}>Vorige recaps</div>
           {recaps.map((recap, i) => (
             <div key={i} style={{ background: C.paper, borderRadius: 16, padding: "14px 16px", marginBottom: 10, border: `1px solid ${C.sand}` }}>
-              <div style={{ fontSize: 11, color: C.muted, marginBottom: 10, fontFamily: "'Georgia', serif" }}>{recap.week}</div>
+              <div style={{ fontSize: 11, color: C.muted, marginBottom: 10 }}>{recap.week}</div>
               <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
                 {[{ o: OWNERS[0], a: recap.sven }, { o: OWNERS[1], a: recap.eva }].map(({ o, a }) => (
                   <div key={o.id} style={{ flex: 1 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
-                      <Avatar ownerId={o.id} size={18} />
-                      <span style={{ fontSize: 11, color: o.color, fontFamily: "'Georgia', serif" }}>{o.label}</span>
-                      <span style={{ fontSize: 14 }}>{["😴","😐","🙂","😊","🔥"][(a?.energy || 1) - 1]}</span>
-                    </div>
-                    {a?.highlight && <div style={{ fontSize: 11, color: C.brown, lineHeight: 1.5, fontFamily: "'Georgia', serif" }}>✨ {a.highlight}</div>}
-                    {a?.focus    && <div style={{ fontSize: 11, color: C.brown, lineHeight: 1.5, marginTop: 2, fontFamily: "'Georgia', serif" }}>🎯 {a.focus}</div>}
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}><Avatar ownerId={o.id} size={18} /><span style={{ fontSize: 11, color: o.color }}>{o.label}</span><span style={{ fontSize: 14 }}>{["😴","😐","🙂","😊","🔥"][(a?.energy || 1) - 1]}</span></div>
+                    {a?.highlight && <div style={{ fontSize: 11, color: C.brown, lineHeight: 1.5 }}>✨ {a.highlight}</div>}
+                    {a?.focus    && <div style={{ fontSize: 11, color: C.brown, lineHeight: 1.5, marginTop: 2 }}>🎯 {a.focus}</div>}
                   </div>
                 ))}
               </div>
-              {recap.insight && (
-                <div style={{ background: `${C.gold}14`, borderRadius: 10, padding: "8px 12px", fontSize: 11, color: C.brown, lineHeight: 1.5, fontFamily: "'Georgia', serif" }}>
-                  ✦ {recap.insight}
-                </div>
-              )}
+              {recap.insight && <div style={{ background: `${C.gold}14`, borderRadius: 10, padding: "8px 12px", fontSize: 11, color: C.brown, lineHeight: 1.5 }}>✦ {recap.insight}</div>}
             </div>
           ))}
         </div>
@@ -1459,10 +1396,10 @@ const BLUEPRINT_PILLARS = [
   { id: "supps",      label: "Supplementen & Medicatie", emoji: "💊", attia: "Creatine, omega-3, vitamine D3+K2, magnesium — op basis van bloedwaarden" },
   { id: "emotioneel", label: "Emotionele Gezondheid",    emoji: "🧠", attia: "Stressmanagement, sociale verbinding, therapie/coaching, zingeving" },
 ];
-
 const BLUEPRINT_KEYS = { sven: "tipo-v5-blueprint-sven", eva: "tipo-v5-blueprint-eva" };
 
-function ProfielTab({ memory, setMemory }) {
+function ProfielTab({ memory, setMemory, dna, setDna }) {
+  const [profielTab, setProfielTab] = useState("persoonlijk"); // "persoonlijk" | "gezin"
   const [person, setPerson]         = useState("sven");
   const [blueprints, setBlueprints] = useState({ sven: {}, eva: {} });
   const [editing, setEditing]       = useState(null);
@@ -1477,128 +1414,256 @@ function ProfielTab({ memory, setMemory }) {
   }, []);
 
   const buildMemory = (updatedBp, extraCtx) => {
-    const bpSven = Object.entries(updatedBp.sven || {}).map(([k, v]) => {
-      const p = BLUEPRINT_PILLARS.find(x => x.id === k);
-      return v ? `Sven ${p?.label}: ${v}` : null;
-    }).filter(Boolean).join(" | ");
-    const bpEva = Object.entries(updatedBp.eva || {}).map(([k, v]) => {
-      const p = BLUEPRINT_PILLARS.find(x => x.id === k);
-      return v ? `Eva ${p?.label}: ${v}` : null;
-    }).filter(Boolean).join(" | ");
+    const bpSven = Object.entries(updatedBp.sven || {}).map(([k, v]) => { const p = BLUEPRINT_PILLARS.find(x => x.id === k); return v ? `Sven ${p?.label}: ${v}` : null; }).filter(Boolean).join(" | ");
+    const bpEva  = Object.entries(updatedBp.eva  || {}).map(([k, v]) => { const p = BLUEPRINT_PILLARS.find(x => x.id === k); return v ? `Eva ${p?.label}: ${v}` : null; }).filter(Boolean).join(" | ");
     return [extraCtx, bpSven, bpEva].filter(Boolean).join("\n");
   };
 
   const savePillar = () => {
     const updated = { ...blueprints, [person]: { ...blueprints[person], [editing]: draftText } };
-    setBlueprints(updated);
-    saveData(BLUEPRINT_KEYS[person], updated[person]);
+    setBlueprints(updated); saveData(BLUEPRINT_KEYS[person], updated[person]);
     setEditing(null);
     const newMemory = buildMemory(updated, tipoContext);
-    setMemory(newMemory);
-    saveData("tipo-v5-memory", newMemory);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    setMemory(newMemory); saveData("tipo-v5-memory", newMemory);
+    setSaved(true); setTimeout(() => setSaved(false), 2000);
   };
 
   const saveContext = () => {
     saveData("tipo-v5-extra-context", tipoContext);
     const newMemory = buildMemory(blueprints, tipoContext);
-    setMemory(newMemory);
-    saveData("tipo-v5-memory", newMemory);
-    setEditContext(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    setMemory(newMemory); saveData("tipo-v5-memory", newMemory);
+    setEditContext(false); setSaved(true); setTimeout(() => setSaved(false), 2000);
   };
 
   const currentBp = blueprints[person] || {};
   const o = OWNERS.find(o => o.id === person);
 
   return (
-    <div style={{ flex: 1, overflowY: "auto", padding: "18px 18px 40px" }}>
-      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
-        {["sven", "eva"].map(p => {
-          const owner  = OWNERS.find(o => o.id === p);
-          const filled = Object.keys(blueprints[p] || {}).filter(k => blueprints[p][k]).length;
-          return (
-            <button key={p} onClick={() => setPerson(p)} style={{
-              flex: 1, padding: "14px", borderRadius: 16, cursor: "pointer",
-              border: `1.5px solid ${person === p ? owner.color : C.sand}`,
-              background: person === p ? owner.bg : C.paper,
-              display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
-            }}>
-              <Avatar ownerId={p} size={36} />
-              <div style={{ fontSize: 13, color: person === p ? owner.color : C.dark, fontFamily: "'Georgia', serif" }}>{owner.label}</div>
-              <div style={{ fontSize: 10, color: C.muted }}>{filled}/{BLUEPRINT_PILLARS.length} pijlers ingevuld</div>
-            </button>
-          );
-        })}
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      {/* Profiel sub-tabs */}
+      <div style={{ display: "flex", background: C.sand, borderBottom: `1px solid ${C.sandDark}`, flexShrink: 0 }}>
+        <button onClick={() => setProfielTab("persoonlijk")} style={{ flex: 1, padding: "10px 4px 12px", border: "none", background: "none", cursor: "pointer", color: profielTab === "persoonlijk" ? C.dark : C.muted, borderBottom: profielTab === "persoonlijk" ? `2.5px solid ${C.dark}` : "2.5px solid transparent", fontSize: 12, fontFamily: "'Georgia', serif" }}>👤 Persoonlijk</button>
+        <button onClick={() => setProfielTab("gezin")} style={{ flex: 1, padding: "10px 4px 12px", border: "none", background: "none", cursor: "pointer", color: profielTab === "gezin" ? C.dark : C.muted, borderBottom: profielTab === "gezin" ? `2.5px solid ${C.gold}` : "2.5px solid transparent", fontSize: 12, fontFamily: "'Georgia', serif" }}>🏡 Gezins-DNA</button>
       </div>
 
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 9, letterSpacing: 2, color: C.muted, textTransform: "uppercase", marginBottom: 12 }}>🏗 Leefstijl Blueprint — {o?.label}</div>
-        {BLUEPRINT_PILLARS.map(pillar => {
-          const value     = currentBp[pillar.id] || "";
-          const isEditing = editing === pillar.id;
-          return (
-            <div key={pillar.id} style={{ background: C.paper, borderRadius: 14, padding: "14px 16px", marginBottom: 10, border: `1px solid ${value ? C.sandDark : C.sand}` }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: isEditing ? 10 : value ? 8 : 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 20 }}>{pillar.emoji}</span>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: C.dark, fontFamily: "'Georgia', serif" }}>{pillar.label}</div>
-                    {!value && !isEditing && <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>Nog niet ingevuld</div>}
+      {/* Persoonlijk */}
+      {profielTab === "persoonlijk" && (
+        <div style={{ flex: 1, overflowY: "auto", padding: "18px 18px 40px" }}>
+          <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+            {["sven", "eva"].map(p => {
+              const owner = OWNERS.find(o => o.id === p);
+              const filled = Object.keys(blueprints[p] || {}).filter(k => blueprints[p][k]).length;
+              return (
+                <button key={p} onClick={() => setPerson(p)} style={{ flex: 1, padding: "14px", borderRadius: 16, cursor: "pointer", border: `1.5px solid ${person === p ? owner.color : C.sand}`, background: person === p ? owner.bg : C.paper, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                  <Avatar ownerId={p} size={36} />
+                  <div style={{ fontSize: 13, color: person === p ? owner.color : C.dark, fontFamily: "'Georgia', serif" }}>{owner.label}</div>
+                  <div style={{ fontSize: 10, color: C.muted }}>{filled}/{BLUEPRINT_PILLARS.length} pijlers</div>
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 9, letterSpacing: 2, color: C.muted, textTransform: "uppercase", marginBottom: 12 }}>🏗 Leefstijl Blueprint — {o?.label}</div>
+            {BLUEPRINT_PILLARS.map(pillar => {
+              const value = currentBp[pillar.id] || "";
+              const isEditing = editing === pillar.id;
+              return (
+                <div key={pillar.id} style={{ background: C.paper, borderRadius: 14, padding: "14px 16px", marginBottom: 10, border: `1px solid ${value ? C.sandDark : C.sand}` }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: isEditing ? 10 : value ? 8 : 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 20 }}>{pillar.emoji}</span>
+                      <div><div style={{ fontSize: 13, fontWeight: 700, color: C.dark, fontFamily: "'Georgia', serif" }}>{pillar.label}</div>{!value && !isEditing && <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>Nog niet ingevuld</div>}</div>
+                    </div>
+                    <button onClick={() => { setEditing(isEditing ? null : pillar.id); setDraftText(value); }} style={{ padding: "5px 12px", borderRadius: 10, border: `1px solid ${C.sand}`, background: "none", color: C.muted, fontSize: 11, cursor: "pointer" }}>{isEditing ? "Annuleer" : value ? "Bewerk" : "Invullen"}</button>
                   </div>
+                  {!value && !isEditing && <div style={{ fontSize: 11, color: C.sandDark, fontStyle: "italic", lineHeight: 1.5, marginTop: 6 }}>💡 Attia: {pillar.attia}</div>}
+                  {value && !isEditing && <div style={{ fontSize: 13, color: C.brown, lineHeight: 1.6, fontFamily: "'Georgia', serif" }}>{value}</div>}
+                  {isEditing && (
+                    <div>
+                      <div style={{ fontSize: 11, color: C.sandDark, fontStyle: "italic", marginBottom: 8, lineHeight: 1.5 }}>💡 {pillar.attia}</div>
+                      <textarea autoFocus value={draftText} onChange={e => setDraftText(e.target.value)} placeholder={`Beschrijf ${o?.label}'s protocol voor ${pillar.label.toLowerCase()}...`} rows={3}
+                        style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: `1.5px solid ${o?.color}`, fontSize: 13, fontFamily: "'Georgia', serif", color: C.dark, outline: "none", resize: "none", lineHeight: 1.6, background: "white", boxSizing: "border-box" }}
+                      />
+                      <button onClick={savePillar} style={{ marginTop: 8, padding: "8px 18px", borderRadius: 10, border: "none", background: o?.color, color: "white", fontSize: 13, cursor: "pointer", fontWeight: 700 }}>Opslaan {saved ? "✓" : ""}</button>
+                    </div>
+                  )}
                 </div>
-                <button onClick={() => { setEditing(isEditing ? null : pillar.id); setDraftText(value); }} style={{
-                  padding: "5px 12px", borderRadius: 10, border: `1px solid ${C.sand}`,
-                  background: "none", color: C.muted, fontSize: 11, cursor: "pointer",
-                }}>{isEditing ? "Annuleer" : value ? "Bewerk" : "Invullen"}</button>
-              </div>
-              {!value && !isEditing && <div style={{ fontSize: 11, color: C.sandDark, fontStyle: "italic", lineHeight: 1.5, marginTop: 6 }}>💡 Attia: {pillar.attia}</div>}
-              {value && !isEditing && <div style={{ fontSize: 13, color: C.brown, lineHeight: 1.6, fontFamily: "'Georgia', serif" }}>{value}</div>}
-              {isEditing && (
-                <div>
-                  <div style={{ fontSize: 11, color: C.sandDark, fontStyle: "italic", marginBottom: 8, lineHeight: 1.5 }}>💡 {pillar.attia}</div>
-                  <textarea autoFocus value={draftText} onChange={e => setDraftText(e.target.value)}
-                    placeholder={`Beschrijf ${o?.label}'s protocol voor ${pillar.label.toLowerCase()}...`} rows={3}
-                    style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: `1.5px solid ${o?.color}`, fontSize: 13, fontFamily: "'Georgia', serif", color: C.dark, outline: "none", resize: "none", lineHeight: 1.6, background: "white", boxSizing: "border-box" }}
-                  />
-                  <button onClick={savePillar} style={{ marginTop: 8, padding: "8px 18px", borderRadius: 10, border: "none", background: o?.color, color: "white", fontSize: 13, cursor: "pointer", fontWeight: 700 }}>
-                    Opslaan {saved ? "✓" : ""}
-                  </button>
-                </div>
-              )}
+              );
+            })}
+          </div>
+          <div style={{ background: C.dark, borderRadius: 16, padding: "16px 18px", marginBottom: 20 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <div style={{ fontSize: 9, letterSpacing: 2, color: C.gold, textTransform: "uppercase" }}>✦ Extra TIPO Context</div>
+              <button onClick={() => setEditContext(!editContext)} style={{ padding: "5px 12px", borderRadius: 10, border: "none", background: editContext ? "#333" : C.gold, color: editContext ? "#AAA" : C.dark, fontSize: 11, cursor: "pointer" }}>{editContext ? "Annuleer" : "Bewerk"}</button>
             </div>
-          );
-        })}
+            {editContext ? (
+              <div>
+                <textarea value={tipoContext} onChange={e => setTipoContext(e.target.value)} placeholder="Extra context — bijv. knieblessure, medicatie, zwangerschapdetails..." rows={4}
+                  style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "none", background: "#2A2218", color: "#E8E0D0", fontSize: 13, fontFamily: "'Georgia', serif", outline: "none", resize: "none", lineHeight: 1.6, boxSizing: "border-box" }}
+                />
+                <button onClick={saveContext} style={{ marginTop: 8, padding: "8px 18px", borderRadius: 10, border: "none", background: C.gold, color: C.dark, fontSize: 13, cursor: "pointer", fontWeight: 700 }}>{saved ? "Opgeslagen ✓" : "Opslaan"}</button>
+              </div>
+            ) : (
+              <div style={{ fontSize: 13, color: tipoContext ? "#C8C0B0" : "#555", lineHeight: 1.6, fontFamily: "'Georgia', serif" }}>{tipoContext || "Nog geen extra context."}</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Gezins-DNA */}
+      {profielTab === "gezin" && (
+        <GezinsDNA dna={dna} setDna={setDna} />
+      )}
+    </div>
+  );
+}
+
+// ─── GEZINS-DNA ───────────────────────────────────────────────────────────────
+function GezinsDNA({ dna, setDna }) {
+  const [editingId, setEditingId]   = useState(null);
+  const [draftText, setDraftText]   = useState("");
+  const [draftLinks, setDraftLinks] = useState([]);
+  const [newLinkLabel, setNewLinkLabel] = useState("");
+  const [newLinkUrl, setNewLinkUrl]     = useState("");
+  const [addingLink, setAddingLink]     = useState(false);
+  const [saved, setSaved]           = useState(false);
+  const [showInfo, setShowInfo]     = useState(null);
+
+  const currentSection = DNA_SECTIONS.find(s => s.id === editingId);
+
+  const openEdit = (section) => {
+    setEditingId(section.id);
+    setDraftText(dna[section.id]?.text || "");
+    setDraftLinks(dna[section.id]?.links || []);
+    setAddingLink(false);
+    setNewLinkLabel(""); setNewLinkUrl("");
+  };
+
+  const saveSection = () => {
+    const updated = { ...dna, [editingId]: { text: draftText, links: draftLinks } };
+    setDna(updated);
+    saveData(KEYS.dna, updated);
+    setEditingId(null);
+    setSaved(true); setTimeout(() => setSaved(false), 2000);
+  };
+
+  const addLink = () => {
+    if (!newLinkLabel.trim() || !newLinkUrl.trim()) return;
+    const url = newLinkUrl.startsWith("http") ? newLinkUrl : `https://${newLinkUrl}`;
+    setDraftLinks(prev => [...prev, { id: `l${Date.now()}`, label: newLinkLabel.trim(), url }]);
+    setNewLinkLabel(""); setNewLinkUrl(""); setAddingLink(false);
+  };
+  const removeLink = (id) => setDraftLinks(prev => prev.filter(l => l.id !== id));
+
+  const filledCount = DNA_SECTIONS.filter(s => dna[s.id]?.text).length;
+
+  return (
+    <div style={{ flex: 1, overflowY: "auto", padding: "18px 18px 40px" }}>
+      {/* Header */}
+      <div style={{ background: C.dark, borderRadius: 18, padding: "18px 20px", marginBottom: 20 }}>
+        <div style={{ fontSize: 9, letterSpacing: 3, color: C.gold, textTransform: "uppercase", marginBottom: 8, opacity: 0.8 }}>Gezins-DNA</div>
+        <div style={{ fontSize: 14, color: "#E8E0D0", fontFamily: "'Georgia', serif", lineHeight: 1.6, marginBottom: 12 }}>
+          Jullie gedeelde waarden, visie en context. TIPO gebruikt dit bij elk advies en elke zoektaak.
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ flex: 1, height: 4, background: "rgba(255,255,255,0.08)", borderRadius: 2, overflow: "hidden" }}>
+            <div style={{ height: "100%", width: `${filledCount / DNA_SECTIONS.length * 100}%`, background: C.gold, borderRadius: 2, transition: "width 0.5s" }} />
+          </div>
+          <span style={{ fontSize: 11, color: C.gold, fontFamily: "monospace" }}>{filledCount}/{DNA_SECTIONS.length}</span>
+        </div>
       </div>
 
-      <div style={{ background: C.dark, borderRadius: 16, padding: "16px 18px", marginBottom: 20 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-          <div style={{ fontSize: 9, letterSpacing: 2, color: C.gold, textTransform: "uppercase" }}>✦ Extra TIPO Context</div>
-          <button onClick={() => setEditContext(!editContext)} style={{
-            padding: "5px 12px", borderRadius: 10, border: "none",
-            background: editContext ? "#333" : C.gold, color: editContext ? "#AAA" : C.dark,
-            fontSize: 11, cursor: "pointer",
-          }}>{editContext ? "Annuleer" : "Bewerk"}</button>
-        </div>
-        {editContext ? (
-          <div>
-            <textarea value={tipoContext} onChange={e => setTipoContext(e.target.value)}
-              placeholder="Extra context voor TIPO — bijv. knieblessure links, medicatie, persoonlijke doelen, allergieën, zwangerschap details..." rows={4}
-              style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "none", background: "#2A2218", color: "#E8E0D0", fontSize: 13, fontFamily: "'Georgia', serif", outline: "none", resize: "none", lineHeight: 1.6, boxSizing: "border-box" }}
-            />
-            <button onClick={saveContext} style={{ marginTop: 8, padding: "8px 18px", borderRadius: 10, border: "none", background: C.gold, color: C.dark, fontSize: 13, cursor: "pointer", fontWeight: 700 }}>
-              {saved ? "Opgeslagen ✓" : "Opslaan"}
-            </button>
+      {/* Sections */}
+      {DNA_SECTIONS.map(section => {
+        const data    = dna[section.id] || {};
+        const hasText = !!data.text;
+        const hasLinks = (data.links || []).length > 0;
+        const isEditing = editingId === section.id;
+
+        return (
+          <div key={section.id} style={{ background: C.paper, borderRadius: 16, padding: "16px 18px", marginBottom: 12, border: `1px solid ${hasText ? C.sandDark : C.sand}` }}>
+            {/* Section header */}
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: hasText || isEditing ? 12 : 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
+                <span style={{ fontSize: 22, flexShrink: 0 }}>{section.emoji}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: C.dark, fontFamily: "'Georgia', serif" }}>{section.label}</div>
+                    <button onClick={() => setShowInfo(showInfo === section.id ? null : section.id)} style={{ background: "none", border: `1px solid ${C.sandDark}`, borderRadius: "50%", width: 18, height: 18, fontSize: 10, color: C.muted, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>i</button>
+                  </div>
+                  {!hasText && !isEditing && <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>Nog niet ingevuld</div>}
+                </div>
+              </div>
+              <button onClick={() => isEditing ? setEditingId(null) : openEdit(section)} style={{ padding: "5px 12px", borderRadius: 10, border: `1px solid ${C.sand}`, background: "none", color: C.muted, fontSize: 11, cursor: "pointer", flexShrink: 0 }}>
+                {isEditing ? "Annuleer" : hasText ? "Bewerk" : "Invullen"}
+              </button>
+            </div>
+
+            {/* Info tooltip */}
+            {showInfo === section.id && (
+              <div style={{ background: `${C.gold}15`, borderRadius: 10, padding: "10px 12px", marginBottom: 10, fontSize: 12, color: C.brown, lineHeight: 1.55, fontFamily: "'Georgia', serif", borderLeft: `3px solid ${C.gold}` }}>
+                ℹ️ {section.info}
+              </div>
+            )}
+
+            {/* View mode */}
+            {hasText && !isEditing && (
+              <div style={{ fontSize: 13, color: C.brown, lineHeight: 1.65, fontFamily: "'Georgia', serif", marginBottom: hasLinks ? 10 : 0 }}>
+                {data.text}
+              </div>
+            )}
+            {hasLinks && !isEditing && (
+              <div style={{ marginTop: 8 }}>
+                {(data.links || []).map(l => (
+                  <a key={l.id} href={l.url} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 0", fontSize: 12, color: C.sven, textDecoration: "none" }}>
+                    <span>🔗</span> {l.label}
+                  </a>
+                ))}
+              </div>
+            )}
+
+            {/* Edit mode */}
+            {isEditing && (
+              <div>
+                <textarea autoFocus value={draftText} onChange={e => setDraftText(e.target.value)} placeholder={section.placeholder} rows={4}
+                  style={{ width: "100%", padding: "12px 14px", borderRadius: 12, border: `1.5px solid ${C.gold}`, fontSize: 13, fontFamily: "'Georgia', serif", color: C.dark, outline: "none", resize: "none", lineHeight: 1.65, background: "white", boxSizing: "border-box", marginBottom: 12 }}
+                />
+
+                {/* Links in edit mode */}
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 9, letterSpacing: 2, color: C.muted, textTransform: "uppercase", marginBottom: 8 }}>🔗 Bronnen & Links</div>
+                  {draftLinks.map(l => (
+                    <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: `1px solid ${C.sand}` }}>
+                      <span style={{ fontSize: 13, flex: 1, color: C.sven, fontFamily: "'Georgia', serif" }}>{l.label}</span>
+                      <button onClick={() => removeLink(l.id)} style={{ background: "none", border: "none", color: C.sandDark, cursor: "pointer", fontSize: 16 }}>×</button>
+                    </div>
+                  ))}
+                  {addingLink ? (
+                    <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+                      <input value={newLinkLabel} onChange={e => setNewLinkLabel(e.target.value)} placeholder="Omschrijving"
+                        style={{ padding: "8px 12px", borderRadius: 9, border: `1px solid ${C.sand}`, fontSize: 13, fontFamily: "'Georgia', serif", outline: "none", color: C.dark }}
+                      />
+                      <input value={newLinkUrl} onChange={e => setNewLinkUrl(e.target.value)} placeholder="URL (bijv. www.example.nl)" onKeyDown={e => e.key === "Enter" && addLink()}
+                        style={{ padding: "8px 12px", borderRadius: 9, border: `1px solid ${C.sand}`, fontSize: 13, fontFamily: "'Georgia', serif", outline: "none", color: C.dark }}
+                      />
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button onClick={() => setAddingLink(false)} style={{ flex: 1, padding: "7px", borderRadius: 9, border: `1px solid ${C.sand}`, background: "none", color: C.muted, fontSize: 12, cursor: "pointer" }}>Annuleer</button>
+                        <button onClick={addLink} style={{ flex: 2, padding: "7px", borderRadius: 9, border: "none", background: C.gold, color: C.dark, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Toevoegen</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button onClick={() => setAddingLink(true)} style={{ marginTop: 8, padding: "6px 12px", borderRadius: 9, border: `1px dashed ${C.sandDark}`, background: "none", color: C.muted, fontSize: 12, cursor: "pointer" }}>+ Link toevoegen</button>
+                  )}
+                </div>
+
+                <button onClick={saveSection} style={{ width: "100%", padding: "11px", borderRadius: 12, border: "none", background: C.gold, color: C.dark, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Georgia', serif" }}>
+                  {saved ? "Opgeslagen ✓" : "Opslaan"}
+                </button>
+              </div>
+            )}
           </div>
-        ) : (
-          <div style={{ fontSize: 13, color: tipoContext ? "#C8C0B0" : "#555", lineHeight: 1.6, fontFamily: "'Georgia', serif" }}>
-            {tipoContext || "Nog geen extra context. Gebruik dit voor medische info, blessures, persoonlijke doelen die niet in de Blueprint passen."}
-          </div>
-        )}
-        <div style={{ fontSize: 10, color: "#555", marginTop: 8 }}>Wordt samen met je Blueprint meegestuurd bij elk TIPO gesprek.</div>
-      </div>
+        );
+      })}
     </div>
   );
 }
@@ -1611,6 +1676,7 @@ function App() {
   const [routines, setRoutines]         = useState(null);
   const [recaps, setRecaps]             = useState([]);
   const [memory, setMemory]             = useState("");
+  const [dna, setDna]                   = useState({});
   const [loading, setLoading]           = useState(true);
   const [editBabyDate, setEditBabyDate] = useState(false);
   const [babyDateStr, setBabyDateStr]   = useState("2026-09-01");
@@ -1619,14 +1685,23 @@ function App() {
   const daysLeft = Math.max(0, Math.ceil((babyDate - new Date()) / 86400000));
   const babyBorn = new Date() > babyDate;
 
+  // DNA als string voor TIPO context
+  const dnaString = DNA_SECTIONS.map(s => {
+    const d = dna[s.id];
+    if (!d?.text) return null;
+    const links = (d.links || []).map(l => `${l.label}: ${l.url}`).join(", ");
+    return `${s.label}: ${d.text}${links ? ` [${links}]` : ""}`;
+  }).filter(Boolean).join("\n");
+
   useEffect(() => {
     Promise.all([
       loadData(KEYS.tasks,    DEFAULT_TASKS),
       loadData(KEYS.routines, DEFAULT_ROUTINES),
       loadData(KEYS.recaps,   []),
       loadData(KEYS.memory,   ""),
-    ]).then(([t, r, rc, m]) => {
-      setTasks(t); setRoutines(r); setRecaps(rc); setMemory(m);
+      loadData(KEYS.dna,      {}),
+    ]).then(([t, r, rc, m, d]) => {
+      setTasks(t); setRoutines(r); setRecaps(rc); setMemory(m); setDna(d);
       setLoading(false);
     });
   }, []);
@@ -1635,10 +1710,11 @@ function App() {
   useEffect(() => { if (routines)      saveData(KEYS.routines, routines); }, [routines]);
   useEffect(() => { if (recaps.length) saveData(KEYS.recaps,   recaps);   }, [recaps]);
   useEffect(() => { if (memory)        saveData(KEYS.memory,   memory);   }, [memory]);
+  useEffect(() => { if (Object.keys(dna).length) saveData(KEYS.dna, dna); }, [dna]);
 
   if (loading) return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: C.dark, fontFamily: "'Georgia', serif" }}>
-      <div style={{ color: C.gold, fontSize: 28, marginBottom: 12, letterSpacing: -1 }}>TIPO Brain</div>
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: C.dark }}>
+      <div style={{ color: C.gold, fontSize: 28, marginBottom: 12, letterSpacing: -1, fontFamily: "'Georgia', serif" }}>TIPO Brain</div>
       <div style={{ display: "flex", gap: 5 }}>
         {[0,1,2].map(i => <div key={i} style={{ width: 7, height: 7, borderRadius: "50%", background: C.gold, animation: `tipoFade 1.2s ${i*0.2}s infinite` }} />)}
       </div>
@@ -1650,7 +1726,6 @@ function App() {
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, fontFamily: "'Georgia', serif", display: "flex", flexDirection: "column", maxWidth: 480, margin: "0 auto", position: "relative" }}>
-
       {/* Header */}
       <div style={{ background: C.dark, padding: "22px 22px 0", flexShrink: 0 }}>
         <div style={{ fontSize: 9, letterSpacing: 4, color: C.gold, textTransform: "uppercase", marginBottom: 3, opacity: 0.7 }}>Tilanus · Poorthuis</div>
@@ -1658,20 +1733,12 @@ function App() {
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 400, color: "#F5F0E8", letterSpacing: -0.5 }}>TIPO Brain</h1>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             {!babyBorn && daysLeft > 0 && (
-              <div onClick={() => setEditBabyDate(!editBabyDate)}
-                style={{ background: "#2A2218", borderRadius: 12, padding: "5px 10px", textAlign: "center", cursor: "pointer" }}
-                title="Tik om datum aan te passen"
-              >
+              <div onClick={() => setEditBabyDate(!editBabyDate)} style={{ background: "#2A2218", borderRadius: 12, padding: "5px 10px", textAlign: "center", cursor: "pointer" }}>
                 <div style={{ fontSize: 14, color: C.gold, fontWeight: 700, fontFamily: "monospace" }}>{daysLeft}</div>
                 <div style={{ fontSize: 8, color: "#555", letterSpacing: 1 }}>👶 DAGEN</div>
               </div>
             )}
-            {babyBorn && (
-              <div style={{ background: "#2A2218", borderRadius: 12, padding: "5px 10px", textAlign: "center" }}>
-                <div style={{ fontSize: 16 }}>👶</div>
-                <div style={{ fontSize: 8, color: C.gold, letterSpacing: 1 }}>GEBOREN!</div>
-              </div>
-            )}
+            {babyBorn && <div style={{ background: "#2A2218", borderRadius: 12, padding: "5px 10px", textAlign: "center" }}><div style={{ fontSize: 16 }}>👶</div><div style={{ fontSize: 8, color: C.gold, letterSpacing: 1 }}>GEBOREN!</div></div>}
             {editBabyDate && (
               <div style={{ position: "absolute", top: 60, right: 16, background: C.dark, borderRadius: 14, padding: "12px 14px", zIndex: 50, border: `1px solid ${C.gold}44`, boxShadow: "0 4px 20px rgba(0,0,0,0.4)" }}>
                 <div style={{ fontSize: 10, color: C.gold, letterSpacing: 2, marginBottom: 8 }}>👶 UITGEREKENDE DATUM</div>
@@ -1689,40 +1756,29 @@ function App() {
         <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
           <button onClick={() => setFilterOwner(null)} style={{ padding: "5px 13px", borderRadius: 14, border: "none", fontSize: 12, cursor: "pointer", background: !filterOwner ? "#3A3528" : "transparent", color: !filterOwner ? "#F5F0E8" : "#888", fontFamily: "'Georgia', serif" }}>Iedereen</button>
           {OWNERS.map(o => (
-            <button key={o.id} onClick={() => setFilterOwner(filterOwner === o.id ? null : o.id)} style={{
-              padding: "5px 13px", borderRadius: 14,
-              border: `1px solid ${filterOwner === o.id ? o.color : "#444"}`,
-              background: filterOwner === o.id ? o.bg : "transparent",
-              color: filterOwner === o.id ? o.color : "#999",
-              fontSize: 12, cursor: "pointer", fontFamily: "'Georgia', serif",
-            }}>{o.label}</button>
+            <button key={o.id} onClick={() => setFilterOwner(filterOwner === o.id ? null : o.id)} style={{ padding: "5px 13px", borderRadius: 14, border: `1px solid ${filterOwner === o.id ? o.color : "#444"}`, background: filterOwner === o.id ? o.bg : "transparent", color: filterOwner === o.id ? o.color : "#999", fontSize: 12, cursor: "pointer", fontFamily: "'Georgia', serif" }}>{o.label}</button>
           ))}
         </div>
 
         {/* Main tabs */}
-        <div style={{ display: "flex", gap: 0 }}>
+        <div style={{ display: "flex" }}>
           {[
             { id: "taken",    label: "Taken",    emoji: "✓"  },
             { id: "routines", label: "Routines", emoji: "🔄" },
             { id: "recap",    label: "Recap",    emoji: "📊" },
             { id: "profiel",  label: "Profiel",  emoji: "👤" },
           ].map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)} style={{
-              flex: 1, padding: "10px 4px 12px", border: "none", background: "none", cursor: "pointer",
-              color: tab === t.id ? C.gold : "#AAA",
-              borderBottom: tab === t.id ? `2.5px solid ${C.gold}` : "2.5px solid transparent",
-              fontSize: 11, fontFamily: "'Georgia', serif",
-            }}>{t.emoji} {t.label}</button>
+            <button key={t.id} onClick={() => setTab(t.id)} style={{ flex: 1, padding: "10px 4px 12px", border: "none", background: "none", cursor: "pointer", color: tab === t.id ? C.gold : "#AAA", borderBottom: tab === t.id ? `2.5px solid ${C.gold}` : "2.5px solid transparent", fontSize: 11, fontFamily: "'Georgia', serif" }}>{t.emoji} {t.label}</button>
           ))}
         </div>
       </div>
 
       {/* Tab content */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        {tab === "taken"    && <TasksTab tasks={tasks} setTasks={setTasks} memory={memory} recaps={recaps} filterOwner={filterOwner} />}
+        {tab === "taken"    && <TasksTab tasks={tasks} setTasks={setTasks} memory={`${memory}${dnaString ? `\n\nGezins-DNA:\n${dnaString}` : ""}`} dna={dnaString} recaps={recaps} filterOwner={filterOwner} />}
         {tab === "routines" && <RoutinesTab routines={routines} setRoutines={setRoutines} filterOwner={filterOwner} />}
         {tab === "recap"    && <RecapTab tasks={tasks} recaps={recaps} setRecaps={setRecaps} setMemory={setMemory} />}
-        {tab === "profiel"  && <ProfielTab memory={memory} setMemory={setMemory} />}
+        {tab === "profiel"  && <ProfielTab memory={memory} setMemory={setMemory} dna={dna} setDna={setDna} />}
       </div>
 
       <style>{`
