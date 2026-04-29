@@ -548,10 +548,11 @@ function TasksTab({ tasks, setTasks, memory, dna, recaps, filterOwner, activeUse
   };
 
   const openChat = async () => {
-    // Als nog geen gebruiker gekozen: toon picker eerst
-    if (!activeUser) { setShowUserPicker(true); setChatOpen(true); return; }
     setChatOpen(true);
-    if (!greetingDone) {
+    // Altijd picker tonen als geen gebruiker gekozen
+    if (!activeUser) { setShowUserPicker(true); return; }
+    // Greeting alleen als nog niet gedaan EN chat leeg is
+    if (!greetingDone && chatMsgs.length === 0) {
       setGreetingDone(true);
       setChatLoading(true);
       try {
@@ -567,17 +568,17 @@ function TasksTab({ tasks, setTasks, memory, dna, recaps, filterOwner, activeUse
   const selectUser = async (userId) => {
     setActiveUser(userId);
     setShowUserPicker(false);
-    if (!greetingDone) {
-      setGreetingDone(true);
-      setChatLoading(true);
-      try {
-        const greeting = await generateProactiveGreeting(tasks, memory, recaps, userId);
-        setChatMsgs([{ role: "assistant", content: greeting }]);
-      } catch {
-        setChatMsgs([{ role: "assistant", content: "Hoi! Wat kan ik voor je doen?" }]);
-      }
-      setChatLoading(false);
+    // Reset chat en genereer nieuwe persoonlijke greeting
+    setChatMsgs([]);
+    setGreetingDone(true);
+    setChatLoading(true);
+    try {
+      const greeting = await generateProactiveGreeting(tasks, memory, recaps, userId);
+      setChatMsgs([{ role: "assistant", content: greeting }]);
+    } catch {
+      setChatMsgs([{ role: "assistant", content: "Hoi! Wat kan ik voor je doen?" }]);
     }
+    setChatLoading(false);
   };
 
   const TaskRow = ({ task, faded = false }) => {
