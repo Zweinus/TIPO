@@ -1604,7 +1604,7 @@ function ProfielTab({ memory, setMemory }) {
 }
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
-export default function App() {
+function App() {
   const [tab, setTab]                   = useState("taken");
   const [filterOwner, setFilterOwner]   = useState(null);
   const [tasks, setTasks]               = useState(null);
@@ -1733,3 +1733,5 @@ export default function App() {
     </div>
   );
 }
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
