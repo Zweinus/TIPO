@@ -162,14 +162,21 @@ const getMonthKey = () => { const n = new Date(); return `${n.getFullYear()}-M${
 
 // ─── Storage ──────────────────────────────────────────────────────────────────
 const KEYS = {
-  tasks:    "tipo-v5-tasks",
-  routines: "tipo-v5-routines",
-  recaps:   "tipo-v5-recaps",
-  memory:   "tipo-v5-memory",
-  dna:      "tipo-v7-dna",
-  chatHistory: "tipo-v8-chat-history",
+  tasks:       "tipo-v5-tasks",
+  routines:    "tipo-v5-routines",
+  recaps:      "tipo-v5-recaps",
+  memory:      "tipo-v5-memory",
+  dna:         "tipo-v7-dna",
   activeUser:  "tipo-v8-active-user",
+  chatSven:    "tipo-v9-chat-sven",
+  chatEva:     "tipo-v9-chat-eva",
+  memorySven:  "tipo-v9-memory-sven",
+  memoryEva:   "tipo-v9-memory-eva",
 };
+
+const chatKeyFor   = (user) => user === "sven" ? KEYS.chatSven   : KEYS.chatEva;
+const memKeyFor    = (user) => user === "sven" ? KEYS.memorySven : KEYS.memoryEva;
+const MAX_CHAT_MSGS = 20;
 
 async function apiCall(body) {
   const r = await fetch("/api/claude", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -294,6 +301,51 @@ async function generateProactiveGreeting(tasks, memory, recaps, activeUser) {
 async function generateRecapInsight(svenAnswers, evaAnswers, tasks) {
   const system = `Je bent TIPO. Analyseer de wekelijkse recap en geef een concreet inzicht van max 3 zinnen. Focus op patronen en één aanbeveling. Nederlands, warm maar direct.`;
   return callClaude([{ role: "user", content: `Sven: energie ${svenAnswers.energy}/5, goed: ${svenAnswers.highlight}, moeilijk: ${svenAnswers.struggle}, focus: ${svenAnswers.focus}\nEva: energie ${evaAnswers.energy}/5, goed: ${evaAnswers.highlight}, moeilijk: ${evaAnswers.struggle}, focus: ${evaAnswers.focus}` }], system, 400);
+}
+
+
+// ─── Geheugen samenvatting ────────────────────────────────────────────────────
+async function summarizeConversation(msgs, userName, existingMemory) {
+  if (msgs.length < 4) return existingMemory; // te kort om samen te vatten
+  const system = `Je bent TIPO. Maak een beknopte samenvatting (max 100 woorden) van dit gesprek met ${userName}. Focus op: wat is besproken, beslissingen, acties, persoonlijke info die relevant is voor toekomstige gesprekken. Schrijf in derde persoon ("${userName} vertelde dat..."). Nederlands.`;
+  try {
+    const summary = await callClaude(
+      [{ role: "user", content: msgs.map(m => `${m.role === "user" ? userName : "TIPO"}: ${m.content}`).join("\n") }],
+      system, 200
+    );
+    const date = new Date().toLocaleDateString("nl-NL", { day: "numeric", month: "long" });
+    const newEntry = `[${date}] ${summary}`;
+    const combined = [newEntry, existingMemory].filter(Boolean).join("\n\n");
+    // Max 2000 tekens bewaren
+    return combined.slice(0, 2000);
+  } catch { return existingMemory; }
+}
+
+// ─── DNA onboarding via chat ──────────────────────────────────────────────────
+async function askDNAOnboarding(messages, dna) {
+  const filled = DNA_SECTIONS.filter(s => dna[s.id]?.text);
+  const missing = DNA_SECTIONS.filter(s => !dna[s.id]?.text);
+
+  const system = `Je bent TIPO, bezig met het invullen van het Gezins-DNA van Sven en Eva — hun gedeelde waarden, leefstijl en doelen. Dit helpt TIPO om persoonlijker advies te geven.
+
+Al ingevuld: ${filled.map(s => s.label).join(", ") || "niets"}
+Nog leeg: ${missing.map(s => `${s.emoji} ${s.label}`).join(", ") || "alles ingevuld!"}
+
+Stel één vraag tegelijk over de volgende lege sectie. Houd het conversationeel en warm. Als de gebruiker antwoord geeft, verwerk dat dan als tekst voor die sectie.
+
+Als je een sectie wil invullen op basis van het gesprek, voeg een <dna_update> blok toe:
+<dna_update>
+{ "section": "thuis|waarden|gezin|vrije_tijd|financieel|doelen", "text": "de ingevulde tekst" }
+</dna_update>
+
+Als alles ingevuld is: feliciteer hen en geef een korte samenvatting van hun Gezins-DNA.
+Reageer in het Nederlands, warm en beknopt.`;
+
+  const text = await callClaude(messages, system, 400);
+  const match = text.match(/<dna_update>([\s\S]*?)<\/dna_update>/);
+  let update = null;
+  if (match) { try { update = JSON.parse(match[1].trim()); } catch (_) {} }
+  return { text: text.replace(/<dna_update>[\s\S]*?<\/dna_update>/, "").trim(), update };
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -461,7 +513,7 @@ function CardChat({ task, onUpdateTask, memory, dna, onClose }) {
 }
 
 // ─── TAKEN TAB ────────────────────────────────────────────────────────────────
-function TasksTab({ tasks, setTasks, memory, dna, recaps, filterOwner, activeUser, setActiveUser, chatHistory, setChatHistory }) {
+function TasksTab({ tasks, setTasks, memory, dna, recaps, filterOwner, activeUser, setActiveUser, chatHistories, setChatHistories, userMemories, setUserMemories }) {
   const [tab, setTab] = useState("nu");
   const [filterCat, setFilterCat] = useState(null);
   const [adding, setAdding] = useState(false);
@@ -476,8 +528,9 @@ function TasksTab({ tasks, setTasks, memory, dna, recaps, filterOwner, activeUse
   const [draftNotes, setDraftNotes] = useState("");
   const [editNotes, setEditNotes] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
-  const [chatMsgs, setChatMsgs] = useState(chatHistory || []);
-  const [greetingDone, setGreetingDone] = useState(chatHistory?.length > 0);
+  const [chatMsgs, setChatMsgs] = useState([]);
+  const [greetingDone, setGreetingDone] = useState(false);
+  const [chatInited, setChatInited] = useState(false);
   const [showUserPicker, setShowUserPicker] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -485,7 +538,14 @@ function TasksTab({ tasks, setTasks, memory, dna, recaps, filterOwner, activeUse
   const chatEndRef = useRef(null);
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [chatMsgs]);
-  useEffect(() => { setChatHistory(chatMsgs); }, [chatMsgs]);
+  // Sla chat op per gebruiker als msgs veranderen
+  useEffect(() => {
+    if (!activeUser || chatMsgs.length === 0) return;
+    const key = chatKeyFor(activeUser);
+    const trimmed = chatMsgs.slice(-MAX_CHAT_MSGS);
+    setChatHistories(prev => ({ ...prev, [activeUser]: trimmed }));
+    saveData(key, trimmed);
+  }, [chatMsgs]);
 
   const currentList = getList(tab);
   const detailItem  = tasks.find(t => t.id === detailId);
@@ -549,14 +609,23 @@ function TasksTab({ tasks, setTasks, memory, dna, recaps, filterOwner, activeUse
 
   const openChat = async () => {
     setChatOpen(true);
-    // Altijd picker tonen als geen gebruiker gekozen
     if (!activeUser) { setShowUserPicker(true); return; }
-    // Greeting alleen als nog niet gedaan EN chat leeg is
-    if (!greetingDone && chatMsgs.length === 0) {
+    // Laad history voor deze gebruiker als nog niet ingeladen
+    if (!chatInited) {
+      setChatInited(true);
+      const history = chatHistories[activeUser] || [];
+      if (history.length > 0) {
+        setChatMsgs(history);
+        setGreetingDone(true);
+        return;
+      }
+      // Geen history: genereer greeting
       setGreetingDone(true);
       setChatLoading(true);
       try {
-        const greeting = await generateProactiveGreeting(tasks, memory, recaps, activeUser);
+        const userMem = userMemories[activeUser] || "";
+        const fullMem = [memory, userMem].filter(Boolean).join("\n");
+        const greeting = await generateProactiveGreeting(tasks, fullMem, recaps, activeUser);
         setChatMsgs([{ role: "assistant", content: greeting }]);
       } catch {
         setChatMsgs([{ role: "assistant", content: "Hoi! 👋 Wat kan ik voor jullie doen?" }]);
@@ -566,14 +635,35 @@ function TasksTab({ tasks, setTasks, memory, dna, recaps, filterOwner, activeUse
   };
 
   const selectUser = async (userId) => {
+    // Vat huidig gesprek samen als er berichten zijn
+    if (activeUser && chatMsgs.length >= 4) {
+      const existingMem = userMemories[activeUser] || "";
+      const userName = activeUser === "sven" ? "Sven" : "Eva";
+      summarizeConversation(chatMsgs, userName, existingMem).then(summary => {
+        if (summary !== existingMem) {
+          setUserMemories(prev => ({ ...prev, [activeUser]: summary }));
+          saveData(memKeyFor(activeUser), summary);
+        }
+      });
+    }
     setActiveUser(userId);
     setShowUserPicker(false);
-    // Reset chat en genereer nieuwe persoonlijke greeting
+    setChatInited(true);
+    // Laad history voor nieuwe gebruiker
+    const history = chatHistories[userId] || [];
+    if (history.length > 0) {
+      setChatMsgs(history);
+      setGreetingDone(true);
+      return;
+    }
+    // Geen history: genereer greeting
     setChatMsgs([]);
     setGreetingDone(true);
     setChatLoading(true);
     try {
-      const greeting = await generateProactiveGreeting(tasks, memory, recaps, userId);
+      const userMem = userMemories[userId] || "";
+      const fullMem = [memory, userMem].filter(Boolean).join("\n");
+      const greeting = await generateProactiveGreeting(tasks, fullMem, recaps, userId);
       setChatMsgs([{ role: "assistant", content: greeting }]);
     } catch {
       setChatMsgs([{ role: "assistant", content: "Hoi! Wat kan ik voor je doen?" }]);
@@ -965,17 +1055,85 @@ function GezinsDNA({ dna, setDna }) {
   const [draftLinks, setDraftLinks] = useState([]);
   const [newLinkLabel, setNewLinkLabel] = useState(""); const [newLinkUrl, setNewLinkUrl] = useState(""); const [addingLink, setAddingLink] = useState(false);
   const [saved, setSaved] = useState(false); const [showInfo, setShowInfo] = useState(null);
+  const [onboarding, setOnboarding] = useState(false);
+  const [onboardMsgs, setOnboardMsgs] = useState([]);
+  const [onboardInput, setOnboardInput] = useState("");
+  const [onboardLoading, setOnboardLoading] = useState(false);
+  const onboardEndRef = useRef(null);
+
+  useEffect(() => { onboardEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [onboardMsgs]);
+
   const filledCount = DNA_SECTIONS.filter(s => dna[s.id]?.text).length;
   const openEdit = (s) => { setEditingId(s.id); setDraftText(dna[s.id]?.text || ""); setDraftLinks(dna[s.id]?.links || []); setAddingLink(false); setNewLinkLabel(""); setNewLinkUrl(""); };
   const saveSection = () => { const upd = { ...dna, [editingId]: { text: draftText, links: draftLinks } }; setDna(upd); saveData(KEYS.dna, upd); setEditingId(null); setSaved(true); setTimeout(() => setSaved(false), 2000); };
   const addLink = () => { if (!newLinkLabel.trim() || !newLinkUrl.trim()) return; const url = newLinkUrl.startsWith("http") ? newLinkUrl : `https://${newLinkUrl}`; setDraftLinks(prev => [...prev, { id: `l${Date.now()}`, label: newLinkLabel.trim(), url }]); setNewLinkLabel(""); setNewLinkUrl(""); setAddingLink(false); };
   const removeLink = (id) => setDraftLinks(prev => prev.filter(l => l.id !== id));
+
+  const startOnboarding = async () => {
+    setOnboarding(true);
+    setOnboardMsgs([]);
+    setOnboardLoading(true);
+    try {
+      const { text } = await askDNAOnboarding([], dna);
+      setOnboardMsgs([{ role: "assistant", content: text }]);
+    } catch { setOnboardMsgs([{ role: "assistant", content: "Hoi! Laten we jullie Gezins-DNA samen invullen. Vertel me eerst: waar wonen jullie nu, en wat voor woning dromen jullie van?" }]); }
+    setOnboardLoading(false);
+  };
+
+  const sendOnboard = async () => {
+    if (!onboardInput.trim() || onboardLoading) return;
+    const userMsg = { role: "user", content: onboardInput.trim() };
+    const newMsgs = [...onboardMsgs, userMsg];
+    setOnboardMsgs(newMsgs);
+    setOnboardInput("");
+    setOnboardLoading(true);
+    try {
+      const { text, update } = await askDNAOnboarding(newMsgs.map(m => ({ role: m.role, content: m.content })), dna);
+      if (update) {
+        const upd = { ...dna, [update.section]: { ...(dna[update.section] || {}), text: update.text } };
+        setDna(upd);
+        saveData(KEYS.dna, upd);
+      }
+      setOnboardMsgs(prev => [...prev, { role: "assistant", content: text }]);
+    } catch { setOnboardMsgs(prev => [...prev, { role: "assistant", content: "Sorry, probeer opnieuw." }]); }
+    setOnboardLoading(false);
+  };
+
+  if (onboarding) return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div style={{ padding: "14px 18px 10px", borderBottom: `1px solid ${C.sand}`, flexShrink: 0, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div>
+          <div style={{ fontSize: 12, color: C.gold, letterSpacing: 1 }}>✦ Gezins-DNA Onboarding</div>
+          <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{filledCount}/{DNA_SECTIONS.length} secties ingevuld</div>
+        </div>
+        <button onClick={() => setOnboarding(false)} style={{ background: "none", border: `1px solid ${C.sand}`, borderRadius: 10, padding: "5px 12px", color: C.muted, fontSize: 11, cursor: "pointer" }}>Terug</button>
+      </div>
+      <div style={{ flex: 1, overflowY: "auto", padding: "14px 18px", display: "flex", flexDirection: "column", gap: 10 }}>
+        {onboardMsgs.map((msg, i) => (
+          <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
+            <div style={{ maxWidth: "88%", padding: "10px 14px", borderRadius: msg.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px", background: msg.role === "user" ? C.gold : C.sand, color: msg.role === "user" ? C.dark : C.brown, fontSize: 14, lineHeight: 1.6, fontFamily: "'Georgia', serif" }}>{msg.content}</div>
+          </div>
+        ))}
+        {onboardLoading && <div style={{ display: "flex", gap: 5, padding: "10px 14px", background: C.sand, borderRadius: "18px 18px 18px 4px", width: "fit-content" }}>{[0,1,2].map(i => <div key={i} style={{ width: 6, height: 6, borderRadius: "50%", background: C.gold, animation: `tipoFade 1.2s ${i*0.2}s infinite` }} />)}</div>}
+        <div ref={onboardEndRef} />
+      </div>
+      <div style={{ padding: "10px 16px 28px", borderTop: `1px solid ${C.sand}`, display: "flex", gap: 8 }}>
+        <input value={onboardInput} onChange={e => setOnboardInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendOnboard()} placeholder="Typ je antwoord…"
+          style={{ flex: 1, padding: "10px 14px", borderRadius: 22, border: `1px solid ${C.sandDark}`, background: C.paper, color: C.dark, fontSize: 13, fontFamily: "'Georgia', serif", outline: "none" }} />
+        <button onClick={sendOnboard} disabled={onboardLoading} style={{ width: 40, height: 40, borderRadius: "50%", border: "none", flexShrink: 0, background: onboardLoading ? C.sand : C.gold, color: C.dark, cursor: onboardLoading ? "default" : "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>↑</button>
+      </div>
+    </div>
+  );
+
   return (
     <div style={{ flex: 1, overflowY: "auto", padding: "18px 18px 40px" }}>
       <div style={{ background: C.dark, borderRadius: 18, padding: "18px 20px", marginBottom: 20 }}>
         <div style={{ fontSize: 9, letterSpacing: 3, color: C.gold, textTransform: "uppercase", marginBottom: 8, opacity: 0.8 }}>Gezins-DNA</div>
         <div style={{ fontSize: 14, color: "#E8E0D0", fontFamily: "'Georgia', serif", lineHeight: 1.6, marginBottom: 12 }}>Jullie gedeelde waarden, visie en context. TIPO gebruikt dit bij elk advies.</div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}><div style={{ flex: 1, height: 4, background: "rgba(255,255,255,0.08)", borderRadius: 2, overflow: "hidden" }}><div style={{ height: "100%", width: `${filledCount / DNA_SECTIONS.length * 100}%`, background: C.gold, borderRadius: 2, transition: "width 0.5s" }} /></div><span style={{ fontSize: 11, color: C.gold, fontFamily: "monospace" }}>{filledCount}/{DNA_SECTIONS.length}</span></div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}><div style={{ flex: 1, height: 4, background: "rgba(255,255,255,0.08)", borderRadius: 2, overflow: "hidden" }}><div style={{ height: "100%", width: `${filledCount / DNA_SECTIONS.length * 100}%`, background: C.gold, borderRadius: 2, transition: "width 0.5s" }} /></div><span style={{ fontSize: 11, color: C.gold, fontFamily: "monospace" }}>{filledCount}/{DNA_SECTIONS.length}</span></div>
+        <button onClick={startOnboarding} style={{ width: "100%", padding: "10px", borderRadius: 12, border: "none", background: C.gold, color: C.dark, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Georgia', serif" }}>
+          ✦ {filledCount === 0 ? "Vul in met TIPO" : "Verder invullen met TIPO"}
+        </button>
       </div>
       {DNA_SECTIONS.map(section => {
         const data = dna[section.id] || {}; const hasText = !!data.text; const hasLinks = (data.links || []).length > 0; const isEditing = editingId === section.id;
@@ -1089,8 +1247,9 @@ function App() {
   const [recaps, setRecaps]             = useState([]);
   const [memory, setMemory]             = useState("");
   const [dna, setDna]                   = useState({});
-  const [chatHistory, setChatHistory]   = useState([]);
-  const [activeUser, setActiveUser]     = useState(null);
+  const [chatHistories, setChatHistories] = useState({ sven: [], eva: [] });
+  const [userMemories, setUserMemories]   = useState({ sven: "", eva: "" });
+  const [activeUser, setActiveUser]       = useState(null);
   const [loading, setLoading]           = useState(true);
   const [editBabyDate, setEditBabyDate] = useState(false);
   const [babyDateStr, setBabyDateStr]   = useState("2026-09-01");
@@ -1108,11 +1267,16 @@ function App() {
       loadData(KEYS.recaps,      []),
       loadData(KEYS.memory,      ""),
       loadData(KEYS.dna,         {}),
-      loadData(KEYS.chatHistory, []),
-      loadData(KEYS.activeUser,  null),
-    ]).then(([t, r, rc, m, d, ch, au]) => {
+      loadData(KEYS.chatSven,   []),
+      loadData(KEYS.chatEva,    []),
+      loadData(KEYS.memorySven, ""),
+      loadData(KEYS.memoryEva,  ""),
+      loadData(KEYS.activeUser, null),
+    ]).then(([t, r, rc, m, d, cs, ce, ms, me, au]) => {
       setTasks(t); setRoutines(r); setRecaps(rc); setMemory(m); setDna(d);
-      setChatHistory(ch); setActiveUser(au);
+      setChatHistories({ sven: cs, eva: ce });
+      setUserMemories({ sven: ms, eva: me });
+      setActiveUser(au);
       setLoading(false);
     });
   }, []);
@@ -1122,7 +1286,7 @@ function App() {
   useEffect(() => { if (recaps.length)      saveData(KEYS.recaps,      recaps);      }, [recaps]);
   useEffect(() => { if (memory)             saveData(KEYS.memory,      memory);      }, [memory]);
   useEffect(() => { if (Object.keys(dna).length) saveData(KEYS.dna,   dna);         }, [dna]);
-  useEffect(() => { if (chatHistory.length) saveData(KEYS.chatHistory, chatHistory); }, [chatHistory]);
+  // chat history wordt per gebruiker opgeslagen in TasksTab
   useEffect(() => { if (activeUser)         saveData(KEYS.activeUser,  activeUser);  }, [activeUser]);
 
   if (loading) return (
@@ -1174,7 +1338,7 @@ function App() {
       </div>
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        {tab === "taken"    && <TasksTab tasks={tasks} setTasks={setTasks} memory={fullMemory} dna={dnaString} recaps={recaps} filterOwner={filterOwner} activeUser={activeUser} setActiveUser={setActiveUser} chatHistory={chatHistory} setChatHistory={setChatHistory} />}
+        {tab === "taken"    && <TasksTab tasks={tasks} setTasks={setTasks} memory={fullMemory} dna={dnaString} recaps={recaps} filterOwner={filterOwner} activeUser={activeUser} setActiveUser={setActiveUser} chatHistories={chatHistories} setChatHistories={setChatHistories} userMemories={userMemories} setUserMemories={setUserMemories} />}
         {tab === "routines" && <RoutinesTab routines={routines} setRoutines={setRoutines} filterOwner={filterOwner} />}
         {tab === "recap"    && <RecapTab tasks={tasks} recaps={recaps} setRecaps={setRecaps} setMemory={setMemory} />}
         {tab === "profiel"  && <ProfielTab memory={memory} setMemory={setMemory} dna={dna} setDna={setDna} />}
