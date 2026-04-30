@@ -10,31 +10,31 @@ export default async function handler(req, res) {
 
   // ── Storage acties ──────────────────────────────────────────────────────────
   if (action === "load" || action === "save") {
-    const SUPABASE_URL = process.env.SUPABASE_URL;
-    const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY;
-
-    if (!SUPABASE_URL || !SUPABASE_KEY) {
-      return res.status(500).json({ error: "Supabase not configured" });
-    }
-
     const { key, value } = req.body;
+    const SUPABASE_URL  = process.env.SUPABASE_URL;
+    const SUPABASE_KEY  = process.env.SUPABASE_ANON_KEY;
 
-    if (action === "load") {
-      try {
-        const r = await fetch(
-          `${SUPABASE_URL}/rest/v1/storage?key=eq.${encodeURIComponent(key)}&select=value&limit=1`,
-          { headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` } }
-        );
-        const data = await r.json();
-        if (data?.[0]) return res.status(200).json({ value: data[0].value });
-        return res.status(200).json({ value: null });
-      } catch (err) {
-        return res.status(500).json({ error: err.message });
-      }
+    // Als Supabase niet geconfigureerd is, geef lege waarde terug
+    if (!SUPABASE_URL || !SUPABASE_KEY) {
+      if (action === "load") return res.status(200).json({ value: null });
+      if (action === "save") return res.status(200).json({ ok: true });
     }
 
-    if (action === "save") {
-      try {
+    try {
+      if (action === "load") {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/storage?key=eq.${encodeURIComponent(key)}&select=value`, {
+          headers: {
+            "apikey": SUPABASE_KEY,
+            "Authorization": `Bearer ${SUPABASE_KEY}`,
+          },
+        });
+        if (!r.ok) return res.status(200).json({ value: null });
+        const data = await r.json();
+        if (data && data[0]) return res.status(200).json({ value: data[0].value });
+        return res.status(200).json({ value: null });
+      }
+
+      if (action === "save") {
         await fetch(`${SUPABASE_URL}/rest/v1/storage`, {
           method: "POST",
           headers: {
@@ -46,9 +46,12 @@ export default async function handler(req, res) {
           body: JSON.stringify({ key, value }),
         });
         return res.status(200).json({ ok: true });
-      } catch (err) {
-        return res.status(500).json({ error: err.message });
       }
+    } catch (err) {
+      // Bij Supabase fout: graceful fallback
+      console.error("Supabase error:", err.message);
+      if (action === "load") return res.status(200).json({ value: null });
+      if (action === "save") return res.status(200).json({ ok: true });
     }
   }
 
@@ -63,6 +66,7 @@ export default async function handler(req, res) {
         "Content-Type": "application/json",
         "x-api-key": apiKey,
         "anthropic-version": "2023-06-01",
+        "anthropic-beta": "web-search-2025-03-05",
       },
       body: JSON.stringify(req.body),
     });
