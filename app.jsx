@@ -236,34 +236,51 @@ Reageer altijd in het Nederlands. Wees warm, concreet en beknopt.`;
   return { text: text.replace(/<actions>[\s\S]*?<\/actions>/, "").trim(), actions };
 }
 
-async function askCardTIPO(messages, task, memory, dna) {
-  const system = `Je bent de kaartassistent van TIPO voor Sven en Eva. Je helpt specifiek met deze taak:
+async function askCardTIPO(messages, task, memory, dna, activeUser, userMemory) {
+  const userName = activeUser === "sven" ? "Sven" : activeUser === "eva" ? "Eva" : null;
+  const isFirstMessage = messages.length === 1; // alleen het systeem opening bericht
 
-Taak: "${task.text}"
-Categorie: ${task.cat} | Owner: ${task.owner}
+  const system = `Je bent de kaartassistent van TIPO — een proactieve AI-assistent voor Sven en Eva Tilanus-Poorthuis.
+${userName ? `Je praat nu met: ${userName}.` : ""}
+
+━━ TAAK ━━
+Naam: "${task.text}"
+Categorie: ${task.cat} | Lijst: ${task.list} | Owner: ${task.owner}
 Notities: ${task.notes || "geen"}
 Deadline: ${task.deadline || "niet ingesteld"}
-Mijlpalen: ${JSON.stringify(task.milestones || [])}
-Bronnen: ${JSON.stringify(task.bronnen || [])}
+Huidige mijlpalen (${(task.milestones || []).length}): ${task.milestones?.length ? task.milestones.map(m => `${m.done ? "✓" : "○"} ${m.text} (${m.owner})`).join(", ") : "geen"}
+Bronnen: ${task.bronnen?.length ? task.bronnen.map(b => b.label).join(", ") : "geen"}
 
-${memory ? `Achtergrond:\n${memory}\n` : ""}
-${dna ? `Gezins-DNA:\n${dna}\n` : ""}
+━━ PERSOONLIJKE CONTEXT ${userName ? `(${userName})` : ""} ━━
+${userMemory ? userMemory : "Geen persoonlijke context beschikbaar."}
 
-Help actief met onderzoek, vergelijking en advies voor DEZE taak. Gebruik web search als dat nuttig is.
+━━ GEZINS-DNA ━━
+${dna || "Nog niet ingevuld."}
 
-Als je acties wil uitvoeren, voeg een <card_actions> blok toe aan het EINDE:
+━━ ALGEMENE ACHTERGROND ━━
+${memory ? memory.slice(0, 600) : "Geen achtergrond beschikbaar."}
+
+━━ JOUW ROL ━━
+Je bent een proactieve sparringspartner die actief meedenkt en werk uit handen neemt. Regels:
+- Gebruik web search PROACTIEF als je actuele info nodig hebt (prijzen, contacten, opties, reviews)
+- Houd rekening met wie je praat: hun Blueprint, gezondheid, waarden en gezins-DNA
+- Stel concrete mijlpalen voor als een taak complex is
+- Voeg relevante bronnen toe als je ze vindt
+- Wees direct en praktisch — geen overbodige inleidingen
+
+Als je acties wil uitvoeren op de kaart, voeg een <card_actions> blok toe aan het EINDE van je bericht:
 <card_actions>
 [
-  { "type": "add_milestone", "text": "stap", "owner": "sven|eva|samen" },
+  { "type": "add_milestone", "text": "concrete stap", "owner": "sven|eva|samen" },
   { "type": "done_milestone", "id": "m123" },
   { "type": "add_bron", "label": "omschrijving", "url": "https://..." },
-  { "type": "update_notes", "notes": "tekst" }
+  { "type": "update_notes", "notes": "bijgewerkte notitie" }
 ]
 </card_actions>
 
-Reageer in het Nederlands. Wees concreet en proactief.`;
+Reageer in het Nederlands. Maximaal 4 zinnen tenzij je een lijst of overzicht geeft.`;
 
-  const data = await apiCall({ model: "claude-sonnet-4-5", max_tokens: 1500, system, messages, tools: [{ type: "web_search_20250305", name: "web_search" }] });
+  const data = await apiCall({ model: "claude-sonnet-4-5", max_tokens: 2000, system, messages, tools: [{ type: "web_search_20250305", name: "web_search" }] });
   const text = (data.content || []).filter(b => b.type === "text").map(b => b.text).join("\n");
   const match = text.match(/<card_actions>([\s\S]*?)<\/card_actions>/);
   let actions = [];
@@ -444,15 +461,32 @@ function BronnenEditor({ bronnen, onChange, color }) {
 }
 
 // ─── Kaart-chat ───────────────────────────────────────────────────────────────
-function CardChat({ task, onUpdateTask, memory, dna, onClose }) {
+function CardChat({ task, onUpdateTask, memory, dna, onClose, activeUser, userMemory }) {
   const list = getList(task.list);
   const [msgs, setMsgs] = useState(task.cardChat || []);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [proactiveShown, setProactiveShown] = useState((task.cardChat || []).length > 0);
   const chatEndRef = useRef(null);
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs]);
   useEffect(() => { onUpdateTask({ cardChat: msgs }); }, [msgs]);
+
+  // Proactieve opening als chat leeg is
+  useEffect(() => {
+    if (!proactiveShown && msgs.length === 0) {
+      setProactiveShown(true);
+      setLoading(true);
+      const openingMsg = { role: "user", content: `Analyseer deze taak en geef een proactieve opening: wat valt je op, wat kun je voor me uitzoeken of voorstellen? Wees direct en concreet.` };
+      askCardTIPO([openingMsg], task, memory, dna, activeUser, userMemory)
+        .then(({ text, actions }) => {
+          if (actions.length > 0) { const updated = applyCardActions(actions, task); onUpdateTask(updated); }
+          setMsgs([{ role: "assistant", content: text }]);
+        })
+        .catch(() => setMsgs([{ role: "assistant", content: `Ik help je met "${task.text}". Wat wil je uitzoeken of aanpakken?` }]))
+        .finally(() => setLoading(false));
+    }
+  }, []);
 
   const applyCardActions = (actions, currentTask) => {
     let updated = { ...currentTask };
@@ -473,29 +507,28 @@ function CardChat({ task, onUpdateTask, memory, dna, onClose }) {
     setInput("");
     setLoading(true);
     try {
-      const { text, actions } = await askCardTIPO(newMsgs.map(m => ({ role: m.role, content: m.content })), task, memory, dna);
+      const { text, actions } = await askCardTIPO(newMsgs.map(m => ({ role: m.role, content: m.content })), task, memory, dna, activeUser, userMemory);
       if (actions.length > 0) { const updated = applyCardActions(actions, task); onUpdateTask(updated); }
       setMsgs(prev => [...prev, { role: "assistant", content: text }]);
     } catch { setMsgs(prev => [...prev, { role: "assistant", content: "Sorry, er ging iets mis." }]); }
     setLoading(false);
   };
 
+  const userName = activeUser === "sven" ? "Sven" : activeUser === "eva" ? "Eva" : null;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <div style={{ padding: "12px 16px 10px", borderBottom: `1px solid #2A2520`, flexShrink: 0, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <div style={{ color: C.gold, fontSize: 10, letterSpacing: 2, textTransform: "uppercase" }}>Kaartassistent</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ color: C.gold, fontSize: 10, letterSpacing: 2, textTransform: "uppercase" }}>Kaartassistent</div>
+            {userName && <div style={{ fontSize: 10, color: "#555", background: "#2A2520", padding: "2px 8px", borderRadius: 8 }}>{userName}</div>}
+          </div>
           <div style={{ color: "#666", fontSize: 11, marginTop: 1, fontFamily: "'Georgia', serif" }}>{task.text.length > 40 ? task.text.slice(0, 40) + "…" : task.text}</div>
         </div>
         <button onClick={onClose} style={{ background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: 22 }}>×</button>
       </div>
       <div style={{ flex: 1, overflowY: "auto", padding: "12px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
-        {msgs.length === 0 && (
-          <div style={{ textAlign: "center", padding: "28px 0", color: "#555", fontSize: 13, fontFamily: "'Georgia', serif", lineHeight: 1.6 }}>
-            <div style={{ display: "flex", justifyContent: "center", marginBottom: 12, opacity: 0.6 }}><RockyIcon size={40} /></div>
-            Ik help je met <strong style={{ color: C.gold }}>{task.text}</strong>.<br/>Stel een vraag of vraag me iets uit te zoeken.
-          </div>
-        )}
         {msgs.map((msg, i) => (
           <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
             <div style={{ maxWidth: "88%", padding: "10px 14px", borderRadius: msg.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px", background: msg.role === "user" ? C.gold : "#252218", color: msg.role === "user" ? C.dark : "#E8E0D0", fontSize: 14, lineHeight: 1.6, fontFamily: "'Georgia', serif", whiteSpace: "pre-wrap" }}>{msg.content}</div>
@@ -817,7 +850,7 @@ function TasksTab({ tasks, setTasks, memory, dna, recaps, filterOwner, activeUse
 
               {detailView === "chat" && (
                 <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-                  <CardChat task={detailItem} onUpdateTask={(patch) => updateTask(detailItem.id, patch)} memory={memory} dna={dna} onClose={() => setDetailId(null)} />
+                  <CardChat task={detailItem} onUpdateTask={(patch) => updateTask(detailItem.id, patch)} memory={memory} dna={dna} onClose={() => setDetailId(null)} activeUser={activeUser} userMemory={userMemories[activeUser] || ""} />
                 </div>
               )}
             </div>
@@ -1354,10 +1387,3 @@ function App() {
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App />);
-// redeploy
-// fix
-// redeploy
-// fix2
-// fix3
-// fix api
-// public
