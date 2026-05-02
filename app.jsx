@@ -1,7 +1,7 @@
-// TIPO Brain v8
+// TIPO Brain v10
 // Tilanus Poorthuis Gezinsassistent
 // Sven & Eva — iPad keuken app
-// v8: Rocky avatar · Wie-ben-jij selector · Chat history bewaard · Proactief per gebruiker
+// v10: Proactieve kaartassistent · Volledige context · Web search proactief
 
 const { useState, useEffect, useRef } = React;
 
